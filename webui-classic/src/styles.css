@@ -1137,7 +1137,7 @@ textarea[aria-invalid='true'] {
 
 .search-panel {
   display: flex;
-  flex: 0 0 220px;
+  flex: 0 0 260px;
   flex-direction: column;
   gap: 8px;
   padding: 8px;
@@ -1146,13 +1146,25 @@ textarea[aria-invalid='true'] {
   border-right: 1px solid var(--border);
 }
 
+/* The search field on a row of its own, with the button below it to the right */
 .search-main {
   display: flex;
+  flex-direction: column;
   gap: 4px;
 }
 
 .search-main input {
-  flex: 1;
+  width: 100%;
+}
+
+.search-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.search-actions .search-options {
+  margin-right: auto;
 }
 
 .search-panel fieldset {
@@ -1945,18 +1957,20 @@ fieldset.field {
   text-align: right;
 }
 
+.home-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Left to right, row by row. The grid has no fixed height, so that every row gets the height it needs. */
 .home-grid {
   display: grid;
-  flex: 1;
   grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
-  /* Rows as high as their widgets, also when they don't fit the window */
-  grid-auto-rows: max-content;
+  /* The boxes of a row are equally high. A row only grows if the statistics need more room. */
+  grid-auto-rows: minmax(calc(340px * var(--font-scale)), max-content);
   gap: 8px;
-  align-content: start;
-  align-items: start;
-  min-height: 0;
   padding: 8px;
-  overflow: auto;
 }
 
 .home-grid > .view-empty {
@@ -1967,15 +1981,23 @@ fieldset.field {
 .widget {
   display: flex;
   flex-direction: column;
-  height: calc(340px * var(--font-scale));
   min-width: 0;
   background: var(--bg);
   border: 1px solid var(--border-strong);
 }
 
-.widget.widget-stats {
-  height: auto;
-  min-height: calc(200px * var(--font-scale));
+/* Long feeds and notes scroll instead of making their row higher */
+.widget-rss,
+.widget-notes {
+  contain: size;
+}
+
+.widget.rows-2 {
+  grid-row: span 2;
+}
+
+.widget.rows-3 {
+  grid-row: span 3;
 }
 
 .widget > header {

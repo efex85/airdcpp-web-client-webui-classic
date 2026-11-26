@@ -44,7 +44,7 @@ changed, depends on the permissions of the web user.
 
 - After logging in, **Home** is the first tab and is shown; **System log** is the second. Both can be turned off
   under **Settings → View → Home and startup** ("Show the Home tab", "Open the system log after logging in").
-  Without the setting the system log is still available from the View menu, the toolbar and the status bar.
+  A system log that isn't opened automatically is still available from the View menu, the toolbar and the status bar.
 - **Drag a tab** to move it. Esc cancels. Once you have moved tabs, the order is kept after reloading and after
   logging in again, also if that puts Home or the system log somewhere else. A hub returns to its place when it's
   connected again; other windows that you open are added at the end. The order is stored in the browser.
@@ -59,11 +59,23 @@ changed, depends on the permissions of the web user.
   this session and in total, share ratio, download queue, share size and connected hubs. Inside Docker the system
   uptime is normally that of the host machine.
 - **RSS feed**: add as many as you like. Each has its own address, title and refresh interval, and a refresh
-  button. Click an entry to open its link or to search for its title. The client fetches the feeds, as in the
-  official web UI.
+  button. Click an entry to open its link or to search for its title; the search starts at once. The client
+  fetches the feeds, as in the official web UI.
 - **Notes**: saved while typing, at most 60,000 characters each.
 
 Add widgets with the buttons at the top; **⋮** on a widget changes or moves it, and **×** removes it.
+
+**Height**: feeds and notes can be made taller under **⋮ → Height**: Normal, Tall (2 boxes) or Extra tall
+(3 boxes). The boxes are placed from left to right, row by row, and a tall box also occupies the place below it.
+With room for three columns, the order *A, B (tall), C, D, E* gives A and D stacked on the left, B in the middle
+and C and E stacked on the right. Use **Move earlier** and **Move later** to change the order. The number of
+columns depends on the width of the window; a phone shows one.
+
+## Searching
+
+A search window opened from a feed entry, "Search for alternates" and the like starts its search by itself. If no
+hub is connected, it starts as soon as one is. Hubs limit how often one may search, so the client may have to
+queue a search; the window then counts down until it is sent.
 
 ## Colors and text
 

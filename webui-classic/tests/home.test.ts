@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { CONFLICT_MARKER, equal, merge, mergeText } from '../src/lib/merge';
 import { sanitizeStartup, startupTabs } from '../src/lib/startup';
 import { rememberWindow, windowAfterClose } from '../src/lib/windowHistory';
-import { createWidget, DEFAULT_WIDGETS, moveWidget, newWidgetId, sanitizeWidgets } from '../src/lib/widgets';
+import { createWidget, DEFAULT_WIDGETS, moveWidget, newWidgetId, sanitizeWidgets, setWidgetRows } from '../src/lib/widgets';
+import { emptyResultText, progressIsTimed, RESULT_WAIT } from '../src/lib/searchProgress';
 import { formatAge, formatChatTime, formatUptime } from '../src/lib/format';
 import { nickClass } from '../src/lib/user';
 
@@ -147,5 +148,63 @@ describe('formatting', () => {
     expect(nickClass(['op', 'favorite'])).toBe('nick op favorite');
     expect(nickClass(['self', 'op'])).toBe('nick self');
     expect(nickClass([])).toBe('nick');
+  });
+});
+
+describe('widget heights', () => {
+  const list = [createWidget('stats', 'stats'), createWidget('rss', 'a'), createWidget('notes', 'b')];
+
+  it('makes feeds and notes taller and normal again', () => {
+    const tall = setWidgetRows(list, 'a', 2);
+    expect(tall.map((w) => w.rows)).toEqual([undefined, 2, undefined]);
+    expect(setWidgetRows(tall, 'a', 1)).toEqual(list);
+    expect('rows' in setWidgetRows(tall, 'a', 1)[1]!).toBe(false);
+  });
+
+  it('keeps the statistics one row high', () => {
+    expect(setWidgetRows(list, 'stats', 2)).toEqual(list);
+  });
+
+  it('keeps saved heights and drops unusable ones', () => {
+    const saved = [
+      { id: 'a', type: 'rss', rows: 3 },
+      { id: 'b', type: 'notes', rows: 2 },
+      { id: 'c', type: 'notes', rows: 99 },
+      { id: 'd', type: 'notes', rows: '2' },
+      { id: 'stats', type: 'stats', rows: 2 },
+    ];
+    expect(sanitizeWidgets({ list: saved }).list.map((w) => w.rows)).toEqual([3, 2, undefined, undefined, undefined]);
+  });
+
+  it('combines a height set on one device with a change made on another', () => {
+    const base = { list };
+    const mine = { list: setWidgetRows(list, 'a', 2) };
+    const theirs = { list: list.map((w) => (w.id === 'a' ? { ...w, title: 'News' } : w)) };
+    expect(merge(base, mine, theirs).list[1]).toMatchObject({ rows: 2, title: 'News' });
+    // Back to normal on this device, unchanged on the other one
+    expect(merge(mine, base, mine).list[1]!.rows).toBeUndefined();
+  });
+});
+
+describe('progress of a search', () => {
+  it('counts down while the search is queued', () => {
+    const queued = { phase: 'queued', startsAt: 10_000 } as const;
+    expect(emptyResultText(queued, 1000)).toBe('Waiting for the hubs: the search starts in about 9 s');
+    expect(emptyResultText(queued, 10_500)).toBe('Searching…');
+    expect(progressIsTimed(queued, 1000)).toBe(true);
+    expect(progressIsTimed(queued, 10_500)).toBe(false);
+  });
+
+  it('only reports no results some time after the search was sent', () => {
+    const sent = { phase: 'sent', sentAt: 1000 } as const;
+    expect(emptyResultText(sent, 1100)).toBe('Waiting for results…');
+    expect(emptyResultText(sent, 1000 + RESULT_WAIT)).toBe('No results');
+    expect(progressIsTimed(sent, 1000 + RESULT_WAIT)).toBe(false);
+  });
+
+  it('describes the other states', () => {
+    expect(emptyResultText({ phase: 'idle' }, 0)).toBe('Enter a search term');
+    expect(emptyResultText({ phase: 'sending' }, 0)).toBe('Searching…');
+    expect(emptyResultText({ phase: 'failed' }, 0)).toBe('The search failed');
   });
 });

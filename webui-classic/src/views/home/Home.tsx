@@ -17,7 +17,11 @@ const Card = ({ widget, active }: { widget: Widget; active: boolean }) => {
   const Icon = ICONS[widget.type];
 
   return (
-    <section className={`widget widget-${widget.type}`} aria-label={title} data-widget={widget.id}>
+    <section
+      className={`widget widget-${widget.type}${widget.rows ? ` rows-${widget.rows}` : ''}`}
+      aria-label={title}
+      data-widget={widget.id}
+    >
       <header>
         <Icon size={14} className={`i-widget-${widget.type}`} />
         <h2 className="grow">{title}</h2>
@@ -71,11 +75,13 @@ export const Home = ({ active }: { active: boolean }) => {
           {status === 'local' && 'This client can’t sync: saved in this browser only'}
         </span>
       </div>
-      <div className="home-grid">
-        {list.map((widget) => (
-          <Card key={widget.id} widget={widget} active={active} />
-        ))}
-        {!list.length && <div className="view-empty">No widgets. Add them with the buttons above.</div>}
+      <div className="home-scroll">
+        <div className="home-grid">
+          {list.map((widget) => (
+            <Card key={widget.id} widget={widget} active={active} />
+          ))}
+          {!list.length && <div className="view-empty">No widgets. Add them with the buttons above.</div>}
+        </div>
       </div>
     </div>
   );

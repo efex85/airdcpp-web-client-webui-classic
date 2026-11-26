@@ -11,6 +11,7 @@ import { dupeClass } from '../lib/dupe';
 import { formatDate, formatSize, formatSpeed } from '../lib/format';
 import { magnetLink } from '../lib/magnet';
 import { parentPath } from '../lib/path';
+import { emptyResultText, progressIsTimed } from '../lib/searchProgress';
 import { useIsMobile } from '../lib/useIsMobile';
 import { reportError, useApp } from '../store/app';
 import { useLiveList } from '../store/live';
@@ -36,6 +37,8 @@ const UNITS: [number, string][] = [
   [1024 ** 2, 'MiB'],
   [1024 ** 3, 'GiB'],
 ];
+
+const WAITING_FOR_HUB = 'The search starts when a hub is connected';
 
 const typeIcon = (r: { type: SearchResult['type'] }) =>
   r.type?.id === 'directory' ? <Folder size={13} className="i-folder" /> : <File size={13} />;
@@ -166,6 +169,7 @@ export const SearchView = ({ tabKey, active }: { tabKey: string; active: boolean
   const mobile = useIsMobile();
   const results = useLiveList(model.results);
   const status = useSyncExternalStore(model.subscribe, model.getStatus);
+  const progress = useSyncExternalStore(model.subscribe, model.getProgress);
 
   const [pattern, setPattern] = useState(initial?.pattern ?? '');
   const [fileType, setFileType] = useState(initial?.fileType ?? 'any');
@@ -206,13 +210,27 @@ export const SearchView = ({ tabKey, active }: { tabKey: string; active: boolean
     });
   };
 
-  // "Search for alternates" etc. open the window with the search already started
+  // "Search for alternates", a feed entry etc. open the window with the search already started.
+  // A search without a connected hub would fail, so it waits until one is connected.
+  const connected = hubs.some((h) => !skippedHubs.has(h.hub_url) && h.connect_state.id === 'connected');
+  const pending = !!initial && !model.started;
   useEffect(() => {
-    if (initial && !model.started && hubUrls.length) {
-      model.started = true;
-      run(initial.pattern);
+    if (pending && connected) {
+      run(initial!.pattern);
     }
-  }, [initial, hubUrls.length]);
+  }, [pending, connected]);
+
+  // The text of an empty list counts down while the search is waiting
+  const [now, setNow] = useState(Date.now);
+  const timed = !results.length && progressIsTimed(progress, Math.max(now, Date.now()));
+  useEffect(() => {
+    if (!active || !timed) {
+      return;
+    }
+
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(timer);
+  }, [active, timed, progress]);
 
   const resultDownload = (r: SearchResult): Downloadable => ({
     name: r.name,
@@ -332,7 +350,7 @@ export const SearchView = ({ tabKey, active }: { tabKey: string; active: boolean
       onActivate={(r) => void downloadAll([resultDownload(r)])}
       menu={menu}
       mobileTap="menu"
-      empty={status ? 'No results' : 'Enter a search term'}
+      empty={pending && !connected ? WAITING_FOR_HUB : emptyResultText(progress, Date.now())}
     />
   );
 
@@ -355,14 +373,21 @@ export const SearchView = ({ tabKey, active }: { tabKey: string; active: boolean
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
           />
-          <button type="submit" disabled={!pattern.trim() || !hubUrls.length}>
-            <SearchIcon size={13} /> Search
-          </button>
-          {mobile && (
-            <button type="button" aria-label="Search options" aria-expanded={showOptions} onClick={() => setShowOptions(!showOptions)}>
-              <SlidersHorizontal size={13} />
+          <div className="search-actions">
+            {mobile && (
+              <button
+                type="button"
+                className="search-options"
+                aria-expanded={showOptions}
+                onClick={() => setShowOptions(!showOptions)}
+              >
+                <SlidersHorizontal size={13} /> Search options
+              </button>
+            )}
+            <button type="submit" disabled={!pattern.trim() || !hubUrls.length}>
+              <SearchIcon size={13} /> Search
             </button>
-          )}
+          </div>
         </div>
         {(!mobile || showOptions) && options}
       </div>
@@ -395,7 +420,7 @@ export const SearchView = ({ tabKey, active }: { tabKey: string; active: boolean
           )}
         </div>
         <div className="view-status">
-          <span className="grow">{status}</span>
+          <span className="grow">{pending && !connected ? WAITING_FOR_HUB : status}</span>
           <span>{results.length} result(s)</span>
         </div>
       </div>

@@ -1,5 +1,15 @@
 // Adding, changing and removing the widgets of the Home window
-import { createWidget, MAX_WIDGETS, moveWidget, newWidgetId, WIDGET_NAMES, type Widget, type WidgetType } from '../../lib/widgets';
+import {
+  createWidget,
+  MAX_WIDGETS,
+  moveWidget,
+  newWidgetId,
+  setWidgetRows,
+  WIDGET_HEIGHTS,
+  WIDGET_NAMES,
+  type Widget,
+  type WidgetType,
+} from '../../lib/widgets';
 import { toast } from '../../store/app';
 import { noteDoc, removeWidget, widgetsDoc } from '../../store/docs';
 import { confirm, showDialog, type MenuEntry } from '../../store/ui';
@@ -102,6 +112,14 @@ export const widgetMenu = (widget: Widget, title: string): MenuEntry[] => {
           {
             label: widget.type === 'rss' ? 'Settings…' : 'Rename…',
             onClick: () => void editWidget(widget),
+          },
+          {
+            label: 'Height',
+            children: WIDGET_HEIGHTS.map(([rows, label]) => ({
+              label,
+              checked: (widget.rows ?? 1) === rows,
+              onClick: () => widgetsDoc.set({ list: setWidgetRows(list(), widget.id, rows) }),
+            })),
           },
         ]),
     {

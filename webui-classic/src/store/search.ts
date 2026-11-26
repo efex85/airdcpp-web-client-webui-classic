@@ -1,6 +1,7 @@
 // Search windows keep their state here so that results arrive also while they are hidden
 import { ApiError } from '../api/socket';
 import type { SearchResult } from '../api/types';
+import type { SearchProgress } from '../lib/searchProgress';
 import { useApp } from './app';
 import { LiveList } from './live';
 import { socket } from './session';
@@ -20,7 +21,8 @@ export class SearchModel {
   results = new LiveList<SearchResult>(300);
   instanceId: number | null = null;
   status = '';
-  /** Set when the initial search of the window has been run */
+  progress: SearchProgress = { phase: 'idle' };
+  /** Set when a search has been run in this window, so that its initial search isn't run (again) */
   started = false;
   private searchId = '';
   /** ID of the last search that the daemon has reported as sent */
@@ -36,9 +38,11 @@ export class SearchModel {
   };
 
   getStatus = () => this.status;
+  getProgress = () => this.progress;
 
-  private setStatus(status: string) {
+  private setStatus(status: string, progress: SearchProgress) {
     this.status = status;
+    this.progress = progress;
     this.listeners.forEach((l) => l());
   }
 
@@ -64,7 +68,7 @@ export class SearchModel {
         'search_hub_searches_sent',
         (data: { search_id: string; sent: number }) => {
           this.sentId = String(data.search_id);
-          this.setStatus(`Searched ${data.sent} hub(s)`);
+          this.setStatus(`Searched ${data.sent} hub(s)`, { phase: 'sent', sentAt: Date.now() });
         },
         id,
       ),
@@ -73,9 +77,10 @@ export class SearchModel {
   }
 
   async search(query: SearchQuery): Promise<void> {
+    this.started = true;
     this.searchId = 'pending';
     this.results.clear();
-    this.setStatus('Searching…');
+    this.setStatus('Searching…', { phase: 'sending' });
 
     const body = {
       query: {
@@ -108,11 +113,14 @@ export class SearchModel {
       const wait = Math.ceil(response.queue_time / 1000);
       // The search may already have been sent before the response arrived
       if (this.sentId !== this.searchId) {
-        this.setStatus(
-          wait > 1
-            ? `Search queued for ${response.queued_count} hub(s), starting in about ${wait} s`
-            : `Searching ${response.queued_count} hub(s)…`,
-        );
+        if (wait > 1) {
+          this.setStatus(`Search queued for ${response.queued_count} hub(s), starting in about ${wait} s`, {
+            phase: 'queued',
+            startsAt: Date.now() + response.queue_time,
+          });
+        } else {
+          this.setStatus(`Searching ${response.queued_count} hub(s)…`, { phase: 'sending' });
+        }
       }
 
       // Results that arrived before the response
@@ -121,7 +129,7 @@ export class SearchModel {
       existing.forEach(this.results.add);
     } catch (e) {
       this.searchId = '';
-      this.setStatus(`Search failed: ${(e as Error).message}`);
+      this.setStatus(`Search failed: ${(e as Error).message}`, { phase: 'failed' });
     }
   }
 
