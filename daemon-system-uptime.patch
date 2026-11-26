@@ -1,0 +1,62 @@
+diff --git a/airdcpp-webapi/api/SystemApi.cpp b/airdcpp-webapi/api/SystemApi.cpp
+index e6f4b058..540f9126 100644
+--- a/airdcpp-webapi/api/SystemApi.cpp
++++ b/airdcpp-webapi/api/SystemApi.cpp
+@@ -150,6 +150,7 @@ namespace webserver {
+ 			{ "cid", ClientManager::getInstance()->getMyCID().toBase32() },
+ 			{ "client_version", fullVersionString },
+ 			{ "client_started", started },
++			{ "system_started", SystemUtil::getSystemStartTime() },
+ 			{ "language", Localization::getCurLanguageLocale() }
+ 		};
+ 	}
+diff --git a/airdcpp-webapi/web-server/SystemUtil.cpp b/airdcpp-webapi/web-server/SystemUtil.cpp
+index 5a4506e8..0580341d 100644
+--- a/airdcpp-webapi/web-server/SystemUtil.cpp
++++ b/airdcpp-webapi/web-server/SystemUtil.cpp
+@@ -21,6 +21,10 @@
+ 
+ #include <airdcpp/util/text/Text.h>
+ 
++#ifdef __linux__
++#include <fstream>
++#endif
++
+ namespace webserver {
+ 	string SystemUtil::getHostname() noexcept {
+ #ifdef _WIN32
+@@ -35,6 +39,20 @@ namespace webserver {
+ #endif
+ 	}
+ 
++	time_t SystemUtil::getSystemStartTime() noexcept {
++#ifdef __linux__
++		// The file starts with the uptime in seconds, e.g. "12345.67 23456.78"
++		std::ifstream file("/proc/uptime");
++		file.imbue(std::locale::classic());
++
++		long long uptime = 0;
++		if (file >> uptime && uptime > 0) {
++			return time(nullptr) - static_cast<time_t>(uptime);
++		}
++#endif
++		return 0;
++	}
++
+ 	string SystemUtil::getPlatform() noexcept {
+ #ifdef _WIN32
+ 		return "win32";
+diff --git a/airdcpp-webapi/web-server/SystemUtil.h b/airdcpp-webapi/web-server/SystemUtil.h
+index 4f7ad565..6881320a 100644
+--- a/airdcpp-webapi/web-server/SystemUtil.h
++++ b/airdcpp-webapi/web-server/SystemUtil.h
+@@ -26,6 +26,9 @@ namespace webserver {
+ 	public:
+ 		static string getHostname() noexcept;
+ 		static string getPlatform() noexcept;
++
++		// When the operating system was started (Unix time), or 0 if it isn't known
++		static time_t getSystemStartTime() noexcept;
+ 	};
+ }
+ 

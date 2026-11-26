@@ -1,0 +1,13 @@
+diff --git a/airdcpp-webapi/web-server/ExtensionManager.cpp b/airdcpp-webapi/web-server/ExtensionManager.cpp
+index 070322c8..93b19662 100644
+--- a/airdcpp-webapi/web-server/ExtensionManager.cpp
++++ b/airdcpp-webapi/web-server/ExtensionManager.cpp
+@@ -366,7 +366,7 @@ namespace webserver {
+ 		if (calculatedSha1) {
+ 			char mdString[SHA_DIGEST_LENGTH * 2 + 1];
+ 			for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
+-				snprintf(&mdString[i * 2], sizeof(mdString), "%02x", (*calculatedSha1)[i]);
++				snprintf(&mdString[i * 2], 3, "%02x", (*calculatedSha1)[i]);
+ 
+ 			if (compare(string(mdString), aSha1) == 0) {
+ 				return true;

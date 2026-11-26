@@ -1,0 +1,417 @@
+diff --git a/airdcpp-webapi/api/SystemApi.cpp b/airdcpp-webapi/api/SystemApi.cpp
+index 540f9126..6e08a93a 100644
+--- a/airdcpp-webapi/api/SystemApi.cpp
++++ b/airdcpp-webapi/api/SystemApi.cpp
+@@ -22,6 +22,7 @@
+ #include <web-server/JsonUtil.h>
+ #include <web-server/SystemUtil.h>
+ #include <web-server/Timer.h>
++#include <web-server/WebUser.h>
+ #include <web-server/WebServerManager.h>
+ #include <web-server/WebServerSettings.h>
+ #include <web-server/WebUserManager.h>
+@@ -35,10 +36,12 @@
+ #include <airdcpp/core/thread/Thread.h>
+ #include <airdcpp/core/timer/TimerManager.h>
+ 
++#define USER_DATA_KEY "user_data_key"
++
+ namespace webserver {
+ 	SystemApi::SystemApi(Session* aSession) : SubscribableApiModule(aSession, Access::ANY) {
+ 
+-		createSubscriptions({ "away_state" });
++		createSubscriptions({ "away_state", "user_data_updated" });
+ 
+ 		METHOD_HANDLER(Access::ANY, METHOD_GET,		(EXACT_PARAM("stats")),			SystemApi::handleGetStats);
+ 
+@@ -50,11 +53,18 @@ namespace webserver {
+ 
+ 		METHOD_HANDLER(Access::ANY, METHOD_GET,		(EXACT_PARAM("system_info")),	SystemApi::handleGetSystemInfo);
+ 
++		// Data of web user interfaces; every user can only access their own
++		METHOD_HANDLER(Access::ANY, METHOD_GET,		(EXACT_PARAM("user_data"), STR_PARAM(USER_DATA_KEY)),	SystemApi::handleGetUserData);
++		METHOD_HANDLER(Access::ANY, METHOD_POST,	(EXACT_PARAM("user_data"), STR_PARAM(USER_DATA_KEY)),	SystemApi::handleSetUserData);
++		METHOD_HANDLER(Access::ANY, METHOD_DELETE,	(EXACT_PARAM("user_data"), STR_PARAM(USER_DATA_KEY)),	SystemApi::handleDeleteUserData);
++
+ 		ActivityManager::getInstance()->addListener(this);
++		WebUserDataStore::getInstance().addListener(this);
+ 	}
+ 
+ 	SystemApi::~SystemApi() {
+ 		ActivityManager::getInstance()->removeListener(this);
++		WebUserDataStore::getInstance().removeListener(this);
+ 	}
+ 
+ 	// We can't stop the server from a server pool thread...
+@@ -129,6 +139,79 @@ namespace webserver {
+ 		return http::status::ok;
+ 	}
+ 
++	string SystemApi::getUserName() const noexcept {
++		return session->getUser()->getUserName();
++	}
++
++	static const string& getUserDataKey(const ApiRequest& aRequest) {
++		const auto& key = aRequest.getStringParam(USER_DATA_KEY);
++		if (key.size() > WebUserDataStore::MAX_KEY_LENGTH) {
++			throw std::invalid_argument("The key is too long");
++		}
++
++		return key;
++	}
++
++	api_return SystemApi::handleGetUserData(ApiRequest& aRequest) {
++		aRequest.setResponseBody(WebUserDataStore::getInstance().get(getUserName(), getUserDataKey(aRequest)));
++		return http::status::ok;
++	}
++
++	api_return SystemApi::handleSetUserData(ApiRequest& aRequest) {
++		const auto& key = getUserDataKey(aRequest);
++		const auto& body = aRequest.getRequestBody();
++		const auto& value = JsonUtil::getRawField("value", body);
++		const auto baseRevision = JsonUtil::getField<int64_t>("revision", body);
++
++		int64_t revision = 0;
++		switch (WebUserDataStore::getInstance().set(getUserName(), key, value, baseRevision, revision)) {
++			case WebUserDataStore::Result::OK: break;
++			case WebUserDataStore::Result::CONFLICT: {
++				aRequest.setResponseErrorStr("The data has been changed elsewhere");
++				return http::status::conflict;
++			}
++			case WebUserDataStore::Result::TOO_LARGE: {
++				aRequest.setResponseErrorStr("The data is too large");
++				return http::status::bad_request;
++			}
++			case WebUserDataStore::Result::TOO_DEEP: {
++				aRequest.setResponseErrorStr("The data is nested too deeply");
++				return http::status::bad_request;
++			}
++			case WebUserDataStore::Result::TOO_MANY_KEYS: {
++				aRequest.setResponseErrorStr("Too many stored items");
++				return http::status::bad_request;
++			}
++			case WebUserDataStore::Result::SAVE_FAILED: {
++				aRequest.setResponseErrorStr("Saving the data failed (see the system log)");
++				return http::status::internal_server_error;
++			}
++		}
++
++		aRequest.setResponseBody({
++			{ "revision", revision },
++		});
++		return http::status::ok;
++	}
++
++	api_return SystemApi::handleDeleteUserData(ApiRequest& aRequest) {
++		WebUserDataStore::getInstance().remove(getUserName(), getUserDataKey(aRequest));
++		return http::status::no_content;
++	}
++
++	void SystemApi::on(WebUserDataStoreListener::Changed, const string& aUserName, const string& aKey, int64_t aRevision) noexcept {
++		if (aUserName != getUserName()) {
++			return;
++		}
++
++		maybeSend("user_data_updated", [&] {
++			return json({
++				{ "key", aKey },
++				{ "revision", aRevision },
++			});
++		});
++	}
++
+ 	api_return SystemApi::handleGetStats(ApiRequest& aRequest) {
+ 		auto server = session->getServer();
+ 
+diff --git a/airdcpp-webapi/api/SystemApi.h b/airdcpp-webapi/api/SystemApi.h
+index 94e6179d..5f807ebc 100644
+--- a/airdcpp-webapi/api/SystemApi.h
++++ b/airdcpp-webapi/api/SystemApi.h
+@@ -21,11 +21,13 @@
+ 
+ #include <api/base/SubscribableApiModule.h>
+ 
++#include <web-server/WebUserDataStore.h>
++
+ #include <airdcpp/hub/activity/ActivityManager.h>
+ 
+ 
+ namespace webserver {
+-	class SystemApi : public SubscribableApiModule, private ActivityManagerListener {
++	class SystemApi : public SubscribableApiModule, private ActivityManagerListener, private WebUserDataStoreListener {
+ 	public:
+ 		SystemApi(Session* aSession);
+ 		~SystemApi();
+@@ -44,7 +46,14 @@ namespace webserver {
+ 
+ 		api_return handleGetSystemInfo(ApiRequest& aRequest);
+ 
++		api_return handleGetUserData(ApiRequest& aRequest);
++		api_return handleSetUserData(ApiRequest& aRequest);
++		api_return handleDeleteUserData(ApiRequest& aRequest);
++
++		string getUserName() const noexcept;
++
+ 		void on(ActivityManagerListener::AwayModeChanged, AwayMode aNewMode) noexcept override;
++		void on(WebUserDataStoreListener::Changed, const string& aUserName, const string& aKey, int64_t aRevision) noexcept override;
+ 	};
+ }
+ 
+diff --git a/airdcpp-webapi/web-server/WebUserDataStore.cpp b/airdcpp-webapi/web-server/WebUserDataStore.cpp
+new file mode 100644
+index 00000000..214b6058
+--- /dev/null
++++ b/airdcpp-webapi/web-server/WebUserDataStore.cpp
+@@ -0,0 +1,157 @@
++/*
++* This program is free software; you can redistribute it and/or modify
++* it under the terms of the GNU General Public License as published by
++* the Free Software Foundation; either version 3 of the License, or
++* (at your option) any later version.
++*/
++
++#include "stdinc.h"
++#include <web-server/WebUserDataStore.h>
++
++#include <web-server/WebServerSettings.h>
++
++#include <airdcpp/events/LogManager.h>
++#include <airdcpp/util/AppUtil.h>
++
++#include <chrono>
++
++#define CONFIG_DIR AppUtil::PATH_USER_CONFIG
++#define CONFIG_NAME "WebUserData.json"
++#define CONFIG_VERSION 1
++
++namespace webserver {
++	static void logError(const string& aError) noexcept {
++		LogManager::getInstance()->message(aError, LogMessage::SEV_ERROR, "Web server");
++	}
++
++	// Serializing is recursive, so very deeply nested data must be refused before it's processed further
++	static bool isTooDeep(const json& aValue, int aDepth) noexcept {
++		if (!aValue.is_structured()) {
++			return false;
++		}
++
++		if (aDepth >= WebUserDataStore::MAX_DEPTH) {
++			return true;
++		}
++
++		return std::any_of(aValue.begin(), aValue.end(), [aDepth](const json& aChild) {
++			return isTooDeep(aChild, aDepth + 1);
++		});
++	}
++
++	WebUserDataStore& WebUserDataStore::getInstance() noexcept {
++		static WebUserDataStore instance;
++		return instance;
++	}
++
++	void WebUserDataStore::loadUnsafe() noexcept {
++		if (loaded) {
++			return;
++		}
++
++		loaded = true;
++		WebServerSettings::loadSettingFile(CONFIG_DIR, CONFIG_NAME, [this](const json& aJson, int) {
++			const auto& data = aJson.at("users");
++			if (data.is_object()) {
++				users = data;
++			}
++		}, logError, CONFIG_VERSION);
++	}
++
++	bool WebUserDataStore::saveUnsafe() const noexcept {
++		try {
++			return WebServerSettings::saveSettingFile({ { "users", users } }, CONFIG_DIR, CONFIG_NAME, logError, CONFIG_VERSION);
++		} catch (const std::exception& e) {
++			logError(e.what());
++			return false;
++		}
++	}
++
++	json WebUserDataStore::get(const string& aUserName, const string& aKey) noexcept {
++		Lock l(cs);
++		loadUnsafe();
++
++		auto user = users.find(aUserName);
++		if (user != users.end()) {
++			auto item = user->find(aKey);
++			if (item != user->end()) {
++				return *item;
++			}
++		}
++
++		return { { "revision", 0 }, { "value", nullptr } };
++	}
++
++	WebUserDataStore::Result WebUserDataStore::set(const string& aUserName, const string& aKey, const json& aValue, int64_t aRevision, int64_t& revision_) noexcept {
++		if (isTooDeep(aValue, 0)) {
++			return Result::TOO_DEEP;
++		}
++
++		if (aValue.dump().size() > MAX_VALUE_SIZE) {
++			return Result::TOO_LARGE;
++		}
++
++		{
++			Lock l(cs);
++			loadUnsafe();
++
++			const auto previous = users;
++			auto& user = users[aUserName];
++			if (!user.is_object()) {
++				user = json::object();
++			}
++
++			auto item = user.find(aKey);
++			const int64_t current = item == user.end() ? 0 : item->value("revision", int64_t(0));
++			if (current != aRevision) {
++				users = previous;
++				return Result::CONFLICT;
++			}
++
++			if (item == user.end() && user.size() >= MAX_KEYS_PER_USER) {
++				users = previous;
++				return Result::TOO_MANY_KEYS;
++			}
++
++			// Based on the time, so that a revision number isn't used again after the file has been removed
++			const auto now = static_cast<int64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
++				std::chrono::system_clock::now().time_since_epoch()
++			).count());
++			revision_ = std::max(now, current + 1);
++
++			user[aKey] = { { "revision", revision_ }, { "value", aValue } };
++			if (!saveUnsafe()) {
++				users = previous;
++				return Result::SAVE_FAILED;
++			}
++		}
++
++		fire(WebUserDataStoreListener::Changed(), aUserName, aKey, revision_);
++		return Result::OK;
++	}
++
++	void WebUserDataStore::remove(const string& aUserName, const string& aKey) noexcept {
++		{
++			Lock l(cs);
++			loadUnsafe();
++
++			auto user = users.find(aUserName);
++			if (user == users.end() || !user->erase(aKey)) {
++				return;
++			}
++
++			saveUnsafe();
++		}
++
++		fire(WebUserDataStoreListener::Changed(), aUserName, aKey, int64_t(0));
++	}
++
++	void WebUserDataStore::removeUser(const string& aUserName) noexcept {
++		Lock l(cs);
++		loadUnsafe();
++
++		if (users.erase(aUserName)) {
++			saveUnsafe();
++		}
++	}
++}
+diff --git a/airdcpp-webapi/web-server/WebUserDataStore.h b/airdcpp-webapi/web-server/WebUserDataStore.h
+new file mode 100644
+index 00000000..5ea0d1e9
+--- /dev/null
++++ b/airdcpp-webapi/web-server/WebUserDataStore.h
+@@ -0,0 +1,67 @@
++/*
++* This program is free software; you can redistribute it and/or modify
++* it under the terms of the GNU General Public License as published by
++* the Free Software Foundation; either version 3 of the License, or
++* (at your option) any later version.
++*/
++
++#ifndef DCPLUSPLUS_WEBSERVER_WEBUSERDATASTORE_H
++#define DCPLUSPLUS_WEBSERVER_WEBUSERDATASTORE_H
++
++#include "forward.h"
++
++#include <airdcpp/core/Speaker.h>
++#include <airdcpp/core/thread/CriticalSection.h>
++
++namespace webserver {
++	class WebUserDataStoreListener {
++	public:
++		virtual ~WebUserDataStoreListener() { }
++		template<int I>	struct X { enum { TYPE = I }; };
++
++		typedef X<0> Changed;
++
++		// The revision is 0 if the value was removed
++		virtual void on(Changed, const string& /*aUserName*/, const string& /*aKey*/, int64_t /*aRevision*/) noexcept { }
++	};
++
++	// Small pieces of data that web user interfaces want to keep for each user, so that they are the same on all
++	// devices of the user. The content is not interpreted. Saved in WebUserData.json of the configuration directory.
++	class WebUserDataStore : public Speaker<WebUserDataStoreListener> {
++	public:
++		static constexpr size_t MAX_KEY_LENGTH = 64;
++		static constexpr size_t MAX_VALUE_SIZE = 256 * 1024;
++		static constexpr size_t MAX_KEYS_PER_USER = 200;
++		static constexpr int MAX_DEPTH = 32;
++
++		enum class Result { OK, CONFLICT, TOO_LARGE, TOO_DEEP, TOO_MANY_KEYS, SAVE_FAILED };
++
++		static WebUserDataStore& getInstance() noexcept;
++
++		// {"revision": <number>, "value": <data>}; the revision is 0 and the value null if there is nothing stored
++		json get(const string& aUserName, const string& aKey) noexcept;
++
++		// Stores the value if aRevision is the current revision (so that changes made elsewhere aren't overwritten).
++		// revision_ receives the new revision.
++		Result set(const string& aUserName, const string& aKey, const json& aValue, int64_t aRevision, int64_t& revision_) noexcept;
++
++		void remove(const string& aUserName, const string& aKey) noexcept;
++		void removeUser(const string& aUserName) noexcept;
++
++		WebUserDataStore(WebUserDataStore&) = delete;
++		WebUserDataStore& operator=(WebUserDataStore&) = delete;
++	private:
++		WebUserDataStore() = default;
++
++		void loadUnsafe() noexcept;
++		bool saveUnsafe() const noexcept;
++
++		CriticalSection cs;
++		bool loaded = false;
++
++		// User name -> key -> {"revision", "value"}
++		json users = json::object();
++	};
++}
++
++#endif
+diff --git a/airdcpp-webapi/web-server/WebUserManager.cpp b/airdcpp-webapi/web-server/WebUserManager.cpp
+index 306045ab..3d4b69aa 100644
+--- a/airdcpp-webapi/web-server/WebUserManager.cpp
++++ b/airdcpp-webapi/web-server/WebUserManager.cpp
+@@ -23,6 +23,7 @@
+ #include <web-server/Timer.h>
+ #include <web-server/WebServerManager.h>
+ #include <web-server/WebServerSettings.h>
++#include <web-server/WebUserDataStore.h>
+ 
+ #include <airdcpp/core/header/typedefs.h>
+ 
+@@ -423,6 +424,9 @@ namespace webserver {
+ 			users.erase(aUserName);
+ 		}
+ 
++		// A new user with the same name must not get the old data
++		WebUserDataStore::getInstance().removeUser(aUserName);
++
+ 		fire(WebUserManagerListener::UserRemoved(), user);
+ 		setDirty();
+ 		return true;

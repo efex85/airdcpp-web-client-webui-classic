@@ -1,0 +1,326 @@
+import {
+  ArrowLeft,
+  ArrowUp,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  File,
+  Folder,
+  FolderOpen,
+  FolderSync,
+  RefreshCw,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { copyText, openSearch, refreshInShare } from '../actions';
+import { directoryDownload, downloadAll, downloadMenu, fileDownload, type Downloadable } from '../actions/download';
+import { remoteMenu } from '../actions/menus';
+import { viewEntries } from '../actions/view';
+import type { FilelistItem, FilelistSession } from '../api/types';
+import { DataTable, type Column, type RowMenu } from '../components/DataTable';
+import { showItemDetails } from '../components/ItemDetails';
+import { Splitter } from '../components/Splitter';
+import { useAccess } from '../lib/access';
+import { dupeClass } from '../lib/dupe';
+import { formatDate, formatSize } from '../lib/format';
+import { magnetLink } from '../lib/magnet';
+import { lastSegment, parentPath, pathChain } from '../lib/path';
+import { addDirectory, treeRows, type Tree } from '../lib/tree';
+import { useIsMobile } from '../lib/useIsMobile';
+import { reportError, useApp } from '../store/app';
+import { socket } from '../store/session';
+import { openMenu } from '../store/ui';
+
+const isDirectory = (item: FilelistItem) => item.type.id === 'directory';
+
+const COLUMNS: Column<FilelistItem>[] = [
+  { id: 'name', title: 'Name', width: 320, value: (i) => i.name },
+  {
+    id: 'size',
+    title: 'Size',
+    width: 90,
+    align: 'right',
+    mobile: 'right',
+    value: (i) => i.size,
+    render: (i) => formatSize(i.size),
+  },
+  { id: 'type', title: 'Type', width: 150, mobile: 'detail', value: (i) => i.type.str },
+  { id: 'date', title: 'Date', width: 120, mobile: 'detail', value: (i) => i.time, render: (i) => formatDate(i.time) },
+  { id: 'tth', title: 'TTH', width: 300, defaultHidden: true, value: (i) => i.tth },
+];
+
+interface Listing {
+  path: string;
+  items: FilelistItem[];
+}
+
+const View = ({ session, active }: { session: FilelistSession; active: boolean }) => {
+  const { id, user, state } = session;
+  const own = user.flags.includes('self');
+  const mobile = useIsMobile();
+  const canRefresh = useAccess()('share_edit') && own;
+  const generation = useApp((s) => s.generation);
+  const path = session.location?.path;
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [tree, setTree] = useState<Tree>(new Map());
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set(['/']));
+  const history = useRef<{ back: string[]; current?: string; returning: boolean }>({ back: [], returning: false });
+  const [canGoBack, setCanGoBack] = useState(false);
+
+  useEffect(() => {
+    if (!path || state.id !== 'loaded') {
+      return;
+    }
+
+    let current = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const load = (attempt: number) => {
+      socket.get<{ list_path: string; items: FilelistItem[] }>(`filelists/${id}/items/0/100000`).then(
+        (result) => {
+          if (current) {
+            setListing({ path: result.list_path, items: result.items });
+            setTree((t) => addDirectory(t, result.list_path, result.items.filter(isDirectory)));
+          }
+        },
+        (e) => {
+          if (current && e.code === 503 && attempt < 20) {
+            timer = setTimeout(() => load(attempt + 1), 500); // Still loading
+          } else if (current && e.code !== 404) {
+            reportError('Failed to load the directory')(e);
+          }
+        },
+      );
+    };
+
+    load(0);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+    // The client sends a new location whenever the folder has been (re)loaded, also when the path stays the same
+  }, [id, path, state.id, session.location, generation]);
+
+  useEffect(() => {
+    if (!path) {
+      return;
+    }
+
+    const h = history.current;
+    if (h.current !== undefined && h.current !== path && !h.returning) {
+      h.back.push(h.current);
+    }
+
+    h.current = path;
+    h.returning = false;
+    setCanGoBack(h.back.length > 0);
+    // Show where we are
+    setExpanded((old) => new Set([...old, ...pathChain(path).slice(0, -1)]));
+  }, [path]);
+
+  useEffect(() => {
+    if (active && !session.read && state.id === 'loaded') {
+      socket.post(`filelists/${id}/read`).catch(() => undefined);
+    }
+  }, [active, session.read, state.id]);
+
+  const navigate = (target: string, reload = false) =>
+    socket.post(`filelists/${id}/directory`, { list_path: target, reload }).catch(reportError('Open directory'));
+
+  const goBack = () => {
+    const target = history.current.back.pop();
+    if (target !== undefined) {
+      history.current.returning = true;
+      setCanGoBack(history.current.back.length > 0);
+      void navigate(target);
+    }
+  };
+
+  const download = (item: FilelistItem): Downloadable =>
+    isDirectory(item) ? directoryDownload(user, item.path, item.name) : fileDownload(user, item);
+
+  const menu = (items: FilelistItem[]): RowMenu => {
+    const single = items.length === 1 ? items[0] : null;
+    const files = items.filter((i) => !isDirectory(i));
+    return {
+      entries: [
+        ...(single && isDirectory(single) ? [{ label: 'Open', bold: own, onClick: () => void navigate(single.path) }] : []),
+        ...(own ? [] : downloadMenu(items.map(download))),
+        'separator',
+        ...(single ? viewEntries(single, user, own) : []),
+        ...(canRefresh
+          ? [
+              {
+                label: 'Refresh in share',
+                // A file is refreshed by rescanning its folder
+                onClick: () => void refreshInShare(items.map((i) => (isDirectory(i) ? i.path : parentPath(i.path)))),
+              },
+            ]
+          : []),
+        'separator',
+        {
+          label: 'Search for alternates',
+          disabled: !single || isDirectory(single),
+          onClick: () => openSearch({ pattern: single!.tth, fileType: 'tth' }),
+        },
+        {
+          label: 'Search for the name',
+          disabled: !single,
+          onClick: () => openSearch({ pattern: single!.name, fileType: isDirectory(single!) ? 'directory' : 'any' }),
+        },
+        'separator',
+        { label: 'Copy name', onClick: () => void copyText(items.map((i) => i.name).join('\n')) },
+        { label: 'Copy path', onClick: () => void copyText(items.map((i) => i.path).join('\n')) },
+        { label: 'Copy magnet link', disabled: !files.length, onClick: () => void copyText(files.map(magnetLink).join('\n')) },
+        'separator',
+        { label: 'Details', disabled: !single, onClick: () => void showItemDetails(single!) },
+      ],
+      more: () => remoteMenu('filelist_item', items.map((i) => i.id), id),
+    };
+  };
+
+  // The previous directory stays visible while the next one is being loaded
+  const loading = !listing || listing.path !== path || state.id !== 'loaded';
+  const items = listing?.items ?? [];
+
+  const directoryTree = (
+    <div className="tree" role="tree" aria-label="Folders">
+      {treeRows(tree, expanded, path ?? '/').map(({ node, depth, children, expanded: isOpen }) => (
+        <div
+          key={node.path}
+          role="treeitem"
+          aria-selected={node.path === path}
+          aria-expanded={children.length ? isOpen : undefined}
+          className={`tree-row${node.path === path ? ' selected' : ''}`}
+          style={{ paddingLeft: depth * 14 + 2 }}
+        >
+          <button
+            type="button"
+            className="tree-toggle"
+            aria-label={isOpen ? 'Collapse' : 'Expand'}
+            onClick={() => {
+              const next = new Set(expanded);
+              if (!next.delete(node.path)) {
+                next.add(node.path);
+                if (!node.children) {
+                  void navigate(node.path); // Loads the subdirectories
+                }
+              }
+
+              setExpanded(next);
+            }}
+            // Directories without subdirectories have nothing to expand
+            style={{ visibility: node.children && !node.children.length ? 'hidden' : undefined }}
+          >
+            {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          </button>
+          <button type="button" className="tree-name" onClick={() => void navigate(node.path)}>
+            {node.path === path ? <FolderOpen size={13} className="i-folder" /> : <Folder size={13} className="i-folder" />}
+            <span>{node.path === '/' ? user.nicks : node.name}</span>
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+
+  const table = (
+    <DataTable
+      id="filelist"
+      label="Files"
+      columns={COLUMNS}
+      items={items}
+      itemKey={(i) => String(i.id)}
+      icon={(i) => (isDirectory(i) ? <Folder size={13} className="i-folder" /> : <File size={13} />)}
+      // Everything in the own list is shared, so there is nothing to point out
+      rowClass={own ? undefined : (i) => dupeClass(i.dupe)}
+      rank={(i) => (isDirectory(i) ? 0 : 1)}
+      defaultSort={{ column: 'name', desc: false }}
+      menu={menu}
+      onActivate={(i) => {
+        if (isDirectory(i)) {
+          void navigate(i.path);
+        } else if (!own) {
+          void downloadAll([download(i)]);
+        }
+      }}
+      mobileTap={(i) => (isDirectory(i) ? 'activate' : 'menu')}
+      empty={loading ? state.str : 'The folder is empty'}
+    />
+  );
+
+  return (
+    <div className="view">
+      <div className="path-bar">
+        <button type="button" aria-label="Back" title="Back" disabled={!canGoBack} onClick={goBack}>
+          <ArrowLeft size={13} />
+        </button>
+        <button
+          type="button"
+          aria-label="Up"
+          title="Up one folder"
+          disabled={!path || path === '/'}
+          onClick={() => void navigate(parentPath(path!))}
+        >
+          <ArrowUp size={13} />
+        </button>
+        <button type="button" aria-label="Reload" title="Reload" disabled={!path} onClick={() => void navigate(path!, true)}>
+          <RefreshCw size={13} />
+        </button>
+        <nav className="breadcrumbs" aria-label="Path">
+          {pathChain(path ?? '/').map((p) => (
+            <button key={p} type="button" onClick={() => void navigate(p)}>
+              {p === '/' ? user.nicks : lastSegment(p)}
+            </button>
+          ))}
+        </nav>
+        {canRefresh && path && (
+          <button type="button" aria-label="Refresh in share" title="Refresh this folder in the share" onClick={() => void refreshInShare([path])}>
+            <FolderSync size={13} />
+          </button>
+        )}
+        {!own && path && path !== '/' && (
+          <button
+            type="button"
+            title="Download this folder"
+            onClick={(e) => {
+              const entries = downloadMenu([directoryDownload(user, path, lastSegment(path))]);
+              openMenu({ x: e.clientX, y: e.clientY }, entries, undefined, lastSegment(path));
+            }}
+          >
+            <Download size={13} />
+          </button>
+        )}
+      </div>
+      <div className="view-main">
+        {mobile ? (
+          table
+        ) : (
+          <Splitter
+            id="filelistTree"
+            direction="row"
+            fixed="first"
+            initial={260}
+            min={120}
+            first={directoryTree}
+            second={table}
+          />
+        )}
+      </div>
+      <div className="view-status">
+        <span className="grow">{loading ? state.str : `${items.length} item(s) in this folder`}</span>
+        <span>
+          {session.total_files > 0 && `${session.total_files} files, `}
+          {session.total_size >= 0 && formatSize(session.total_size)}
+        </span>
+        <span className="wide">{session.share_profile?.str ?? user.hub_names}</span>
+      </div>
+    </div>
+  );
+};
+
+export const Filelist = ({ id, active }: { id: string; active: boolean }) => {
+  const session = useApp((s) => s.filelists.find((l) => l.id === id));
+  return session ? (
+    <View session={session} active={active} />
+  ) : (
+    <div className="view-empty">The file list has been closed</div>
+  );
+};
