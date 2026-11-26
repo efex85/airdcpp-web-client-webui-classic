@@ -5,7 +5,7 @@ classic desktop DC client: menu bar, toolbar, window tabs at the bottom, sortabl
 pane and a status bar. Dark theme. It talks to the daemon through its Web API; the system uptime and the syncing
 between devices need two small daemon patches of this image.
 
-Build image is available at https://hub.docker.com/r/rafsis/airdcpp-web-client-webui-classic
+Built image is available at https://hub.docker.com/r/rafsis/airdcpp-web-client-webui-classic
 
 ## What is included
 
