@@ -27,18 +27,8 @@ Details are in [webui-classic/README.md](webui-classic/README.md).
 
 ## Build
 
-You need Docker and an internet connection: the build fetches base images, Debian packages, the daemon source,
-the npm packages of the web UI and Node.js (for extensions).
+sh build.sh
 
-```sh
-./build.sh              # build and push to the private registry
-./build.sh --no-push    # build only
-```
-
-The image is tagged with the date and time of the build and as `latest`. The default name is
-`repository.palomaa.se/airdcpp-webclient-mod-xl-webui`; `REGISTRY`, `IMAGE` and `TAG` can be set as environment
-variables, for example `TAG=test ./build.sh --no-push`. If the registry asks for a login, run
-`docker login repository.palomaa.se` first.
 
 ## Run
 
@@ -47,7 +37,7 @@ An example `docker-compose.yml`:
 ```yaml
 services:
   airdcpp:
-    image: repository.palomaa.se/airdcpp-webclient-mod-xl-webui:latest
+    image: your.repo/airdcpp-web-client-webui-classic:tag
     environment:
       PUID: "1000"
       PGID: "1000"
