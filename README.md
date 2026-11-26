@@ -1,4 +1,4 @@
-# AirDC++ Web Client WebUI Classic
+# AirDC++ Web Client mod-xl
 
 A Debian based Docker image of AirDC++ Web Client with:
 
@@ -7,34 +7,113 @@ A Debian based Docker image of AirDC++ Web Client with:
 2. **Hub user commands** in the hub and user-list menus (what the Windows client shows when you
    right-click a hub or a user) – `daemon-hubcommands.patch`
 3. **System uptime** on the Home page of the web UI – `daemon-system-uptime.patch`
-4. **Syncing between devices** of the Home page, notes and colors of the web UI – `daemon-user-data.patch`
+4. **Syncing between devices** of the Home widgets, notes, colors and startup choices of the web UI –
+   `daemon-user-data.patch`
 
-## Build and run
+## The web UI
+
+- A classic desktop layout with a menu bar, toolbar, window tabs at the bottom, sortable lists and right-click
+  menus. Dark theme, with a layout of its own for phones.
+- Hubs, private messages, search, file lists, download queue, transfers, favorite hubs, system log, and viewing
+  text, NFO, image, audio and video files.
+- A **Home** window with system statistics, RSS feeds and notes. It can be turned off.
+- Tabs can be rearranged by dragging them with a mouse or pen. Closing a window returns to the previous one.
+- Your own colors and color sets, text sizes, chat font and timestamps.
+- The toolbar refreshes the whole share, the incoming folders or a single shared folder.
+- Chat commands are passed to the client, so extensions that add `/commands` can react to them.
+- The settings of the official web UI.
+
+Details are in [webui-classic/README.md](webui-classic/README.md).
+
+## Build
+
+You need Docker and an internet connection: the build fetches base images, Debian packages, the daemon source,
+the npm packages of the web UI and Node.js (for extensions).
 
 ```sh
 ./build.sh              # build and push to the private registry
 ./build.sh --no-push    # build only
 ```
 
-The image is tagged with the date and time of the build and as `latest`; the registry and image name are set
-at the top of `build.sh`. The web UI is at `http://host:5600/`. See
-[webui-classic/README.md](webui-classic/README.md) for what it contains.
+The image is tagged with the date and time of the build and as `latest`. The default name is
+`repository.palomaa.se/airdcpp-webclient-mod-xl-webui`; `REGISTRY`, `IMAGE` and `TAG` can be set as environment
+variables, for example `TAG=test ./build.sh --no-push`. If the registry asks for a login, run
+`docker login repository.palomaa.se` first.
 
-The web UI is part of the image, so there is nothing to choose: the `WEBUI` variable of earlier versions
-is no longer read. The old address `/classic/index.html` forwards to `/`.
+## Run
+
+An example `docker-compose.yml`:
+
+```yaml
+services:
+  airdcpp:
+    image: repository.palomaa.se/airdcpp-webclient-mod-xl-webui:latest
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+    ports:
+      - "5600:5600"        # web UI, HTTP
+      - "5601:5601"        # web UI, HTTPS (self-signed certificate)
+      - "21248:21248/tcp"  # incoming connections
+      - "21248:21248/udp"  # incoming search results
+      - "21249:21249/tcp"  # encrypted incoming connections
+    volumes:
+      - ./config:/.airdcpp
+      - ./downloads:/Downloads
+      - ./share:/Share
+    restart: unless-stopped
+```
+
+```sh
+mkdir -p config downloads share    # they must be writable for PUID and PGID
+docker compose up -d
+```
+
+| Variable        | Meaning                                                                                   |
+|-----------------|-------------------------------------------------------------------------------------------|
+| `PUID`, `PGID`  | user and group that the client runs as, 101 or higher; required when started as root      |
+| `UMASK`         | optional, for example `022`                                                               |
+| `LOG_STARTUP`   | optional; any value prints what the start script does                                     |
+
+The web UI is at `http://host:5600/`. The web UI is part of the image, so there is nothing to choose: the `WEBUI`
+variable of earlier versions is no longer read. The old address `/classic/index.html` forwards to `/`.
+
+### Login
+
+With an empty configuration directory the container copies the defaults from `.airdcpp/`, which contain one web
+user, `admin`, with administrator permissions. The file only holds a hash of its password. To set your own
+password, run the commands below. When asked, enter `admin`, answer `y` and type the new password twice.
+
+```sh
+docker compose stop airdcpp
+docker compose run --rm airdcpp --add-user
+docker compose up -d
+```
+
+### Updating
+
+Build and push a new image, then:
+
+```sh
+docker compose pull
+docker compose up -d
+```
+
+Settings, web users and the synced data of the web UI are kept in the configuration directory.
 
 ## What is different from the plain build
 
-The hub user commands feature is a **daemon** change (C++). The web UI asks the daemon for the `hub` and
-`hub_user` menus, so the commands show up in its menus.
-That means the image **cannot use the official release tarball**: the Dockerfile builds the daemon from
+Hub user commands, system uptime and syncing are **daemon** changes (C++). For the commands, the web UI asks the
+daemon for the `hub` and `hub_user` menus, so they show up in its menus.
+These changes mean the image **cannot use the official release tarball**: the Dockerfile builds the daemon from
 source with the patches applied, and assembles the same layout as the official portable package
 (`airdcppd`, `dcppboot.xml`, `web-resources/`).
 
-| What     | Pinned to                                                                                     |
-|----------|------------------------------------------------------------------------------------------------|
-| Debian   | `distro` = `trixie-slim` (Debian 13), used for building and for running                        |
-| Daemon   | `daemon_ref` = `e330cf88…` (version string `2.14.1b-91`)                                       |
+| What         | Pinned to                                                                      |
+|--------------|--------------------------------------------------------------------------------|
+| Debian       | `distro` = `trixie-slim` (Debian 13), for building the daemon and for running  |
+| Web UI build | `node:22-bookworm-slim` (Debian 12), only used while building                  |
+| Daemon       | `daemon_ref` = `e330cf88…` (version string `2.14.1b-91`)                       |
 
 The packages with the libraries that the daemon needs at runtime are not listed in the Dockerfile:
 `list-runtime-deps.sh` looks them up after the build.
