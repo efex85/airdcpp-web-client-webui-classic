@@ -324,7 +324,7 @@ const onAuthenticated = async (response: LoginResponse) => {
 
   showUserColors();
   startSession(startupDoc.value);
-  useApp.setState({ connection: 'connected', login, loginError: null });
+  useApp.setState({ connection: 'connected', login, loginError: null, resuming: false });
   startTimers();
   void requestPermission().catch(() => undefined);
   await initialSync();
@@ -333,7 +333,7 @@ const onAuthenticated = async (response: LoginResponse) => {
 const showLogin = (error: string | null) => {
   stopTimers();
   save('auth', null, 'session');
-  useApp.setState({ connection: 'login', loginError: error, login: null });
+  useApp.setState({ connection: 'login', loginError: error, login: null, resuming: false });
   disconnectDocs();
 };
 
@@ -342,7 +342,7 @@ export const login = async (username: string, password: string, remember: boolea
   rememberLogin = remember;
   save('remember', remember);
   requestFreshStart();
-  useApp.setState({ connection: 'connecting', loginError: null });
+  useApp.setState({ connection: 'connecting', loginError: null, resuming: false });
   try {
     await onAuthenticated(await socket.connect({ grant_type: 'password', username, password }));
   } catch (e) {
@@ -359,8 +359,16 @@ export const resume = async () => {
     return;
   }
 
-  useApp.setState({ connection: 'connecting' });
+  // Set before the first await, so that the page is never drawn with the login form
+  useApp.setState({ connection: 'connecting', resuming: true });
   await reconnect(++attempt);
+};
+
+/** Gives up using the saved login and shows the form; the saved login is tried again after a reload */
+export const cancelResume = () => {
+  attempt++;
+  socket.close();
+  showLogin(null);
 };
 
 const reconnect = async (current: number) => {

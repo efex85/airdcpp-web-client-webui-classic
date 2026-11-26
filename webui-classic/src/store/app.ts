@@ -49,6 +49,8 @@ export interface AppState {
   connection: ConnectionState;
   loginError: string | null;
   login: LoginResponse | null;
+  /** A saved login is being used: the login form isn't shown */
+  resuming: boolean;
   /** Increases after every (re)connect; views reload their data when it changes */
   generation: number;
 
@@ -86,6 +88,7 @@ export const useApp = create<AppState>(() => ({
   connection: 'login',
   loginError: null,
   login: null,
+  resuming: false,
   generation: 0,
   hubs: [],
   chats: [],

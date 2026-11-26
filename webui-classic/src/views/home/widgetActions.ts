@@ -1,4 +1,5 @@
 // Adding, changing and removing the widgets of the Home window
+import type { ReactNode } from 'react';
 import {
   createWidget,
   MAX_WIDGETS,
@@ -66,7 +67,7 @@ const askSettings = async (type: WidgetType, widget?: Widget): Promise<Partial<W
   }
 };
 
-export const addWidget = async (type: WidgetType) => {
+const addWidget = async (type: WidgetType) => {
   const values = type === 'rss' ? await askSettings(type) : {};
   if (!values) {
     return;
@@ -84,6 +85,18 @@ export const addWidget = async (type: WidgetType) => {
     document.querySelector(`[data-widget="${widget.id}"]`)?.scrollIntoView({ block: 'nearest' }),
   );
 };
+
+/** Every kind of widget; there is only one with statistics */
+export const addWidgetMenu = (icon: (type: WidgetType) => ReactNode): MenuEntry[] =>
+  (Object.keys(WIDGET_NAMES) as WidgetType[]).map((type) => {
+    const added = type === 'stats' && list().some((w) => w.type === 'stats');
+    return {
+      label: added ? `${WIDGET_NAMES[type]} (already added)` : WIDGET_NAMES[type],
+      icon: icon(type),
+      disabled: added,
+      onClick: () => void addWidget(type),
+    };
+  });
 
 const editWidget = async (widget: Widget) => {
   const values = await askSettings(widget.type, widget);

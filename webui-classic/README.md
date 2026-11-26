@@ -42,6 +42,9 @@ changed, depends on the permissions of the web user.
 
 ## Windows and tabs
 
+- With "Keep me logged in", opening the page shows **Signing in…** instead of the login form, so that password
+  managers find no fields to fill in. The form appears if the saved login is no longer accepted. If signing in takes
+  more than five seconds, a button offers the form.
 - After logging in, **Home** is the first tab and is shown; **System log** is the second. Both can be turned off
   under **Settings → View → Home and startup** ("Show the Home tab", "Open the system log after logging in").
   A system log that isn't opened automatically is still available from the View menu, the toolbar and the status bar.
@@ -63,7 +66,8 @@ changed, depends on the permissions of the web user.
   fetches the feeds, as in the official web UI.
 - **Notes**: saved while typing, at most 60,000 characters each.
 
-Add widgets with the buttons at the top; **⋮** on a widget changes or moves it, and **×** removes it.
+**+ Add widget** at the top lists the available widgets; there is only one with system statistics. **⋮** on a
+widget changes or moves it, and **×** removes it.
 
 **Height**: feeds and notes can be made taller under **⋮ → Height**: Normal, Tall (2 boxes) or Extra tall
 (3 boxes). The boxes are placed from left to right, row by row, and a tall box also occupies the place below it.

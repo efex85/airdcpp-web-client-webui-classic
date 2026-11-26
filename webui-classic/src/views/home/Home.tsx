@@ -7,9 +7,14 @@ import { openMenu } from '../../store/ui';
 import { NotesWidget } from './NotesWidget';
 import { RssWidget } from './RssWidget';
 import { StatsWidget } from './StatsWidget';
-import { addWidget, askRemoveWidget, updateWidget, widgetMenu } from './widgetActions';
+import { addWidgetMenu, askRemoveWidget, updateWidget, widgetMenu } from './widgetActions';
 
 const ICONS: Record<WidgetType, typeof Rss> = { stats: Activity, rss: Rss, notes: StickyNote };
+
+const widgetIcon = (type: WidgetType) => {
+  const Icon = ICONS[type];
+  return <Icon size={14} className={`i-widget-${type}`} />;
+};
 
 const Card = ({ widget, active }: { widget: Widget; active: boolean }) => {
   const feedTitle = useFeeds((s) => (s[widget.id]?.url === widget.url ? s[widget.id]?.feed?.title : undefined));
@@ -62,14 +67,16 @@ export const Home = ({ active }: { active: boolean }) => {
   return (
     <div className="view home">
       <div className="view-buttons home-buttons">
-        <button type="button" onClick={() => void addWidget('rss')}>
-          <Plus size={13} /> RSS feed
-        </button>
-        <button type="button" onClick={() => void addWidget('notes')}>
-          <Plus size={13} /> Notes
-        </button>
-        <button type="button" disabled={list.some((w) => w.type === 'stats')} onClick={() => void addWidget('stats')}>
-          <Plus size={13} /> System stats
+        <button
+          type="button"
+          aria-haspopup="menu"
+          onClick={(e) => {
+            // Below the button, also when it's used with the keyboard; a sheet on phones
+            const box = e.currentTarget.getBoundingClientRect();
+            openMenu({ x: box.left, y: box.bottom }, addWidgetMenu(widgetIcon), undefined, 'Add widget');
+          }}
+        >
+          <Plus size={13} /> Add widget
         </button>
         <span className="muted grow home-sync">
           {status === 'local' && 'This client can’t sync: saved in this browser only'}
@@ -80,7 +87,7 @@ export const Home = ({ active }: { active: boolean }) => {
           {list.map((widget) => (
             <Card key={widget.id} widget={widget} active={active} />
           ))}
-          {!list.length && <div className="view-empty">No widgets. Add them with the buttons above.</div>}
+          {!list.length && <div className="view-empty">No widgets. Add one with the button above.</div>}
         </div>
       </div>
     </div>

@@ -18,7 +18,7 @@ import { Filelist } from './views/Filelist';
 import { FileViewer } from './views/FileViewer';
 import { Home } from './views/home/Home';
 import { Hub } from './views/Hub';
-import { Login } from './views/Login';
+import { Login, SigningIn } from './views/Login';
 import { PrivateChat } from './views/PrivateChat';
 import { Queue } from './views/Queue';
 import { SearchView } from './views/Search';
@@ -140,11 +140,12 @@ const Main = () => {
 
 export const App = () => {
   const loggedIn = useApp((s) => !!s.login);
+  const resuming = useApp((s) => s.resuming);
   useDocumentTitle();
 
   return (
     <>
-      {loggedIn ? <Main /> : <Login />}
+      {loggedIn ? <Main /> : resuming ? <SigningIn /> : <Login />}
       <ContextMenuHost />
       <DialogHost />
       <Toasts />
