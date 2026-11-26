@@ -3,7 +3,7 @@
 The web UI of this image: a UI for [AirDC++ Web Client](https://airdcpp-web.github.io/) that looks and works like a
 classic desktop DC client: menu bar, toolbar, window tabs at the bottom, sortable lists with right-click menus, a transfer
 pane and a status bar. Dark theme. It talks to the daemon through its Web API; the system uptime and the syncing
-between devices need two small daemon patches of this image (see the [main README](../README.md)).
+between devices need two small daemon patches of this image.
 
 Build image is available at https://hub.docker.com/r/rafsis/airdcpp-web-client-webui-classic
 
