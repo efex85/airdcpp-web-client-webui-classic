@@ -1,180 +1,197 @@
-# AirDC++ Web Client WebUI-Classic
+# AirDC++ Classic
 
-A Debian based Docker image of AirDC++ Web Client WebUI Classic
+The web UI of this image: a UI for [AirDC++ Web Client](https://airdcpp-web.github.io/) that looks and works like a
+classic desktop DC client: menu bar, toolbar, window tabs at the bottom, sortable lists with right-click menus, a transfer
+pane and a status bar. Dark theme. It talks to the daemon through its Web API; the system uptime and the syncing
+between devices need two small daemon patches of this image (see the [main README](../README.md)).
 
-1. **AirDC++ Classic**, a web UI that looks and works like a desktop client – `webui-classic/`.
-   It is the only web UI of the image; the standard web UI is not included.
-2. **Hub user commands** in the hub and user-list menus (what the Windows client shows when you
-   right-click a hub or a user) – `daemon-hubcommands.patch`
-3. **System uptime** on the Home page of the web UI – `daemon-system-uptime.patch`
-4. **Syncing between devices** of the Home widgets, notes, colors and startup choices of the web UI –
-   `daemon-user-data.patch`
+## What is included
 
-## The web UI
+| Window           | Highlights                                                                                                                                              |
+|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Home             | system statistics, RSS feeds and notes                                                                                                                  |
+| Hubs             | chat with clickable magnet, release and web links, Tab nick completion, chat commands; password and redirect prompts                                    |
+| User list        | operators/bots/users groups, column sorting and selection, filter, hub user commands                                                                    |
+| Private messages | including the transport encryption state                                                                                                                |
+| Search           | type, size and excluded words, hub selection, sources of grouped results, view a file or find the NFO of a folder                                       |
+| File lists       | folder tree, download to favorite folders or any folder, item details, view files, Find NFO, own list per share profile, "Refresh in share"             |
+| Viewed files     | text and NFO files, images, audio and video, one window each                                                                                            |
+| Download queue   | priorities, pause and resume all, files and sources of a bundle, remove a user, rescan or force in share after a failed content check, remove completed |
+| Transfers        | window and optional bottom pane; remove a file or a user from the queue                                                                                 |
+| Favorite hubs    | add, connect and edit favorite hubs                                                                                                                     |
+| System log       |                                                                                                                                                         |
+| Settings         | see below                                                                                                                                               |
 
-- A classic desktop layout with a menu bar, toolbar, window tabs at the bottom, sortable lists and right-click
-  menus. Dark theme, with a layout of its own for phones.
-- Hubs, private messages, search, file lists, download queue, transfers, favorite hubs, system log, and viewing
-  text, NFO, image, audio and video files.
-- A **Home** window with system statistics, RSS feeds and notes. It can be turned off.
-- Tabs can be rearranged by dragging them with a mouse or pen. Closing a window returns to the previous one.
-- Your own colors and color sets, text sizes, chat font and timestamps.
-- The toolbar refreshes the whole share, the incoming folders or a single shared folder.
-- Chat commands are passed to the client, so extensions that add `/commands` can react to them.
-- The settings of the official web UI.
+## Settings
 
-Details are in [webui-classic/README.md](webui-classic/README.md).
+Open them with the cog button in the toolbar or from the File menu. The pages follow the official web UI:
+profile and away mode, speed and bandwidth limits, connectivity, downloads (favorite directories, search
+types), sharing (shared folders, share profiles, hashing, excluded paths), notifications and view options,
+extensions, web users, logging, web server, and statistics. Which pages are shown, and whether they can be
+changed, depends on the permissions of the web user.
 
-## Build
+- Changes on a settings page take effect with **Save changes**. Lists (folders, profiles, users and so on)
+  are changed right away through their dialogs.
+- Settings that are detected automatically show the detected value and can't be edited until the detection is
+  turned off. The detected values are not saved over the manual ones.
+- The pages **Home and startup**, **Colors** and **Text and chat** under **View** apply changes immediately.
+  What is synced and what belongs to one browser is listed under [Synced and per browser](#synced-and-per-browser).
+- Popups appear inside the page. While the page is in the background the browser's own notifications are
+  used instead, if you have allowed them; browsers only permit that over HTTPS or on localhost.
+- Some settings of the daemon are only available through its API and are not included.
 
-sh build.sh
+## Windows and tabs
 
+- After logging in, **Home** is the first tab and is shown; **System log** is the second. Both can be turned off
+  under **Settings → View → Home and startup** ("Show the Home tab", "Open the system log after logging in").
+  A system log that isn't opened automatically is still available from the View menu, the toolbar and the status bar.
+- **Drag a tab** to move it. Esc cancels. Once you have moved tabs, the order is kept after reloading and after
+  logging in again, also if that puts Home or the system log somewhere else. A hub returns to its place when it's
+  connected again; other windows that you open are added at the end. The order is stored in the browser.
+  Dragging works with a mouse or a pen, not with a finger.
+- The **×** at the top right closes the window that is shown. Windows can also be closed with the **×** on their
+  tab, with a middle click on the tab, or from the tab's menu. Closing a connected hub asks first.
+- Closing the shown window returns to the window that you used before it.
 
-## Run
+## Home
 
-An example `docker-compose.yml`:
+- **System stats**: system and client uptime, current speeds and running transfers, downloaded and uploaded
+  this session and in total, share ratio, download queue, share size and connected hubs. Inside Docker the system
+  uptime is normally that of the host machine.
+- **RSS feed**: add as many as you like. Each has its own address, title and refresh interval, and a refresh
+  button. Click an entry to open its link or to search for its title; the search starts at once. The client
+  fetches the feeds, as in the official web UI.
+- **Notes**: saved while typing, at most 60,000 characters each.
 
-```yaml
-services:
-  airdcpp:
-    image: your.repo/airdcpp-web-client-webui-classic:tag
-    environment:
-      PUID: "1000"
-      PGID: "1000"
-    ports:
-      - "5600:5600"        # web UI, HTTP
-      - "5601:5601"        # web UI, HTTPS (self-signed certificate)
-      - "21248:21248/tcp"  # incoming connections
-      - "21248:21248/udp"  # incoming search results
-      - "21249:21249/tcp"  # encrypted incoming connections
-    volumes:
-      - ./config:/.airdcpp
-      - ./downloads:/Downloads
-      - ./share:/Share
-    restart: unless-stopped
-```
+Add widgets with the buttons at the top; **⋮** on a widget changes or moves it, and **×** removes it.
+
+**Height**: feeds and notes can be made taller under **⋮ → Height**: Normal, Tall (2 boxes) or Extra tall
+(3 boxes). The boxes are placed from left to right, row by row, and a tall box also occupies the place below it.
+With room for three columns, the order *A, B (tall), C, D, E* gives A and D stacked on the left, B in the middle
+and C and E stacked on the right. Use **Move earlier** and **Move later** to change the order. The number of
+columns depends on the width of the window; a phone shows one.
+
+## Searching
+
+A search window opened from a feed entry, "Search for alternates" and the like starts its search by itself. If no
+hub is connected, it starts as soon as one is. Hubs limit how often one may search, so the client may have to
+queue a search; the window then counts down until it is sent.
+
+## Colors and text
+
+- **Colors**: ready-made color sets, and your own colors for nicknames (yours, operators, bots, other, favorite
+  and ignored users; also bold or not), chats, shared, queued and downloaded items, and the interface itself.
+  The color for favorite users applies to users that are already favorites in the configuration of the client;
+  this interface can't add favorite users.
+- **Tab highlights**: how the tabs of chats are marked, see below.
+- **Text and chat**: text size of the interface and of chats, chat font and timestamp format. List columns
+  become wider or narrower with the text size.
+
+## Tab highlights
+
+Under **Settings → View → Tab highlights** each of these events can mark the tab of its chat or not, with its own
+background color, text color and bold text. On a phone the entry in the list of windows is marked in the same way.
+
+| Chat    | Event                                  | Marks by default | Colors until you set them         |
+|---------|----------------------------------------|------------------|-----------------------------------|
+| Hub     | My nick is mentioned                   | yes, bold        | its own, from the color set       |
+| Hub     | Someone writes                         | yes              | its own, from the color set       |
+| Hub     | A bot writes                           | yes              | as "Someone writes"               |
+| Hub     | Status message                         | no               | as "Someone writes"               |
+| Hub     | Joins, parts and other detail messages | no               | as "Someone writes"               |
+| Private | Someone writes                         | yes, bold        | as a mention in a hub             |
+| Private | A bot writes                           | yes, bold        | as "Someone writes" (private)     |
+| Private | Status message                         | yes              | as "Someone writes" (hub)         |
+
+- A tab is marked while another window is shown. If several events have happened, the first one in the table that
+  is switched on decides how the tab looks.
+- Joins and parts only count when the hub shows them in its chat.
+- A marked mention or private message also puts "(*)" in the title of the page and gives the menu button on phones
+  the color for mentions. Switching the event off removes these marks too. The two colors of that dot are chosen
+  on the same page.
+- The system log, file lists and viewed files use the colors of "My nick is mentioned" and "Someone writes".
+- Notifications are not affected. They are set under **Settings → View → Notifications**.
+
+## Synced and per browser
+
+| Same on all devices of a web user                      | Stored in each browser                                                |
+|--------------------------------------------------------|-----------------------------------------------------------------------|
+| Home widgets, feeds and notes                          | text sizes, chat font, timestamps                                     |
+| colors and tab highlights                              | notifications and the other browser settings                          |
+| "Show the Home tab", "Open the system log …"           | tab order, column widths, pane sizes, whether the transfer pane shows |
+
+Synced data is stored by the client in `WebUserData.json` in its configuration directory. It isn't encrypted.
+If two devices change the same note before seeing each other's text, both versions are kept in the note. With a
+client without the patch, everything is stored in the browser and the pages say so.
+
+## Chat commands
+
+`/me <message>`, `/clear` and `/help` are handled by the web UI. Every command, including `/me`, is also passed to
+the client, so that extensions can react to it (for example the commands of `airdcpp-user-commands`). The client
+doesn't send command text to the hub or to the other user. As in the official web UI, a command that nothing
+handles does nothing.
+
+## Refreshing the share
+
+The refresh button of the toolbar rescans the whole share. Its arrow also offers the incoming folders and each
+shared folder by its name in the file list; a name with several folders opens a submenu for choosing one of them
+or all. The same choices are in the **File** menu (on a phone: menu button → File → Refresh folder). Single folders
+can also be refreshed under **Settings → Sharing → Shared folders**. Refreshing requires the permission to edit
+the share.
+
+## Viewing files
+
+Choose **View as text**, **View image**, **Play audio** or **Play video** from the menu of a file: in file lists,
+search results and on magnet links in chats. A file that isn't in your own share is downloaded from the user first,
+to a temporary file of the client. **Find NFO** in the menu of a folder looks up its NFO file and opens it; the user
+needs a client that supports this kind of search.
+
+- Text is offered for files smaller than 256 KiB, the other kinds for files smaller than 200 MiB, because the web
+  server of the client reads a file into memory before sending it.
+- Which audio and video formats play depends on the browser.
+- The audio and video players get the file from an address that contains the login token of the session, as in the
+  official web UI. Keep that in mind if a reverse proxy writes full addresses to its log.
+- The web user needs the permission to view files.
+
+## Download queue
+
+- **Pause all** pauses every download. **Resume all** gives every download automatic priority again, which also
+  replaces priorities that you have set by hand. To set one priority for several downloads, select them (Ctrl+A
+  selects all) and use **Priority** in their menu.
+- **Rescan for errors** and **Force in share** appear for downloads that failed the content check of an extension.
+  The first runs the check again, the second accepts the download without it.
+- **Remove user from queue** removes the user as a source from all queued files.
+
+**Browse…** under **Download to** opens a folder browser that starts in the folder chosen last time. Web users who
+may not browse the files of the server type the folder instead.
+
+## Own file list
+
+**Refresh in share** (menu of a file or folder, or the button next to the path) rescans a shared folder. New files
+appear once the client has hashed them; use **Reload** if the list doesn't show them yet.
+
+## Using the mouse and keyboard
+
+- Right-click a row, hub tab or column header for its menu.
+- Click, Ctrl+click and Shift+click select rows; the arrow, Home, End, Page Up and Page Down keys move the
+  selection; Enter opens; Delete removes (where removing is possible); typing jumps to a name.
+- Drag column edges and the borders between panes to resize them.
+
+On a phone the layout changes to one window at a time. The menu button opens the window list and menus,
+**⋮** opens the menu of a row and a long press starts selecting several rows.
+
+## Development
+
+Requires Node.js 22 and a running daemon.
 
 ```sh
-mkdir -p config downloads share    # they must be writable for PUID and PGID
-docker compose up -d
+npm ci
+AIRDCPP_URL=http://127.0.0.1:5600 npm run dev    # development server, API requests go to the daemon
+npm test                                          # unit tests
+npm run build                                     # type check and production build in dist/
 ```
 
-| Variable        | Meaning                                                                                   |
-|-----------------|-------------------------------------------------------------------------------------------|
-| `PUID`, `PGID`  | user and group that the client runs as, 101 or higher; required when started as root      |
-| `UMASK`         | optional, for example `022`                                                               |
-| `LOG_STARTUP`   | optional; any value prints what the start script does                                     |
+To use a build without Docker, start the daemon with `airdcppd --web-resources=/path/to/webui-classic/dist`.
 
-The web UI is at `http://host:5600/`. The web UI is part of the image, so there is nothing to choose: the `WEBUI`
-variable of earlier versions is no longer read. The old address `/classic/index.html` forwards to `/`.
-
-### Login
-
-With an empty configuration directory the container copies the defaults from `.airdcpp/`, which contain one web
-user, `admin`, with administrator permissions. The file only holds a hash of its password. To set your own
-password, run the commands below. When asked, enter `admin`, answer `y` and type the new password twice.
-
-```sh
-docker compose stop airdcpp
-docker compose run --rm airdcpp --add-user
-docker compose up -d
-```
-
-### Updating
-
-Build and push a new image, then:
-
-```sh
-docker compose pull
-docker compose up -d
-```
-
-Settings, web users and the synced data of the web UI are kept in the configuration directory.
-
-## What is different from the plain build
-
-Hub user commands, system uptime and syncing are **daemon** changes (C++). For the commands, the web UI asks the
-daemon for the `hub` and `hub_user` menus, so they show up in its menus.
-These changes mean the image **cannot use the official release tarball**: the Dockerfile builds the daemon from
-source with the patches applied, and assembles the same layout as the official portable package
-(`airdcppd`, `dcppboot.xml`, `web-resources/`).
-
-| What         | Pinned to                                                                      |
-|--------------|--------------------------------------------------------------------------------|
-| Debian       | `distro` = `trixie-slim` (Debian 13), for building the daemon and for running  |
-| Web UI build | `node:22-bookworm-slim` (Debian 12), only used while building                  |
-| Daemon       | `daemon_ref` = `e330cf88…` (version string `2.14.1b-91`)                       |
-
-The packages with the libraries that the daemon needs at runtime are not listed in the Dockerfile:
-`list-runtime-deps.sh` looks them up after the build.
-
-By default the git "modified working tree" suffix (`-d`) is left out of the version string. To add a suffix of
-your own, use `docker build --build-arg version_suffix=-xl …`.
-
-## System uptime
-
-A web page can't ask the server for its uptime, and the daemon API only reports when the client was started.
-`daemon-system-uptime.patch` adds `system_started` to the system information: the current time minus the first
-number of `/proc/uptime`. Only logged-in users receive it. Inside a Docker container this is normally the uptime of
-the **host machine**, as containers share its kernel. Without the patch the Home page leaves the line out.
-
-## Syncing between devices
-
-The daemon API has nowhere to keep data of a web UI, so `daemon-user-data.patch` adds it:
-
-| Request                                | Does                                                                   |
-|----------------------------------------|------------------------------------------------------------------------|
-| `GET /api/v1/system/user_data/<key>`   | returns `{"revision", "value"}` (revision 0 = nothing stored)          |
-| `POST /api/v1/system/user_data/<key>`  | stores `{"value", "revision"}`; `409` if the revision is out of date   |
-| `DELETE /api/v1/system/user_data/<key>`| removes the value                                                      |
-| `system` event `user_data_updated`     | tells the other sessions of the same user what changed                 |
-
-- Every web user can only reach their own data. The data of a removed web user is deleted.
-- It is saved in `WebUserData.json` in the configuration directory (`/.airdcpp`), so it survives container updates
-  as long as that directory is kept. Include it in your backups. It is **not encrypted**.
-- Limits: keys of letters, digits and `_` (at most 64), 256 KiB and 32 levels per value, 200 keys per user.
-
-## How the hub commands behave
-
-- Commands come from hubs (sent by the hub) and from the user's own saved commands, filtered for the hub
-  exactly like the Windows client does (all hubs / a specific hub / `op` hubs, NMDC vs ADC).
-- They appear in the hub menu (hub-context commands) and in the user menu in the user list (user-context
-  commands). Names containing `/` become submenus.
-- `%[line:Label]` and `%[kickline:Label]` prompts become input fields in a dialog. A prompt used more than
-  once in a command asks only once. Fields may be left empty.
-- Clicking sends the command through the daemon's own user command code (`sendUserCmd`), the same path
-  the Windows client uses. The command id sent by the browser is re-checked against the commands that are
-  actually available for that hub, so a forged id for another hub's command is ignored.
-
-### Not included
-
-- Search-result and filelist context commands (only the hub and user-list contexts are wired).
-- Separators are skipped (the menu API has no separator item).
-
-## Files
-
-| File                          | Purpose                                                                |
-|-------------------------------|------------------------------------------------------------------------|
-| `Dockerfile`                  | web UI build → daemon build → runtime image                            |
-| `webui-classic/`              | source of the web UI                                                   |
-| `daemon-hubcommands.patch`    | daemon change: hub user commands (new `HubCommandMenuProvider`)        |
-| `daemon-system-uptime.patch`  | daemon change: `system_started` in the system information              |
-| `daemon-user-data.patch`      | daemon change: small per-user data store for the web UI                |
-| `list-runtime-deps.sh`        | finds the runtime library packages during the build                    |
-| `entrypoint.sh`, `.airdcpp/`  | container entrypoint and default config                                |
-| `build.sh`                    | build, tag and push                                                    |
-| `daemon-extension-sha1.patch` | optional daemon fix, not applied by the Dockerfile (see below)         |
-
-### The optional extension fix
-
-The daemon writes the checksum of a downloaded extension with a wrong buffer size. Builds with a compiler
-that checks buffer sizes by default (Ubuntu's, which earlier versions of this image used) abort the daemon
-when an extension with a checksum is downloaded. `daemon-extension-sha1.patch` corrects the size. To apply
-it, add after the other patch lines in the Dockerfile:
-
-```dockerfile
-COPY daemon-extension-sha1.patch /tmp/daemon-extension-sha1.patch
-RUN git apply --check /tmp/daemon-extension-sha1.patch && git apply /tmp/daemon-extension-sha1.patch
-```
-
-The original mod-xl image: https://hub.docker.com/r/rafsis/airdcpp-webclient-mod-xl
+Layout preferences and the browser settings are saved in the browser. With "Keep me logged in", the browser
+also stores a token that signs you in again; logging out removes it.

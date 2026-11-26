@@ -307,6 +307,17 @@ textarea[aria-invalid='true'] {
   color: var(--tab-mention-text, var(--text));
 }
 
+/* Chats: colors and boldness of what has happened (set by lib/tabEvents.ts) */
+.tab.event {
+  background: var(--event-bg);
+  color: var(--event-text);
+}
+
+.tab.event > button[role='tab'],
+.tab.event > span {
+  font-weight: var(--event-weight);
+}
+
 .tab-close {
   padding: 1px;
   opacity: 0.45;
@@ -2242,6 +2253,68 @@ textarea.notes {
   font-size: calc(11px * var(--font-scale));
 }
 
+/* Tab highlights */
+
+.tab-events {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  gap: 8px;
+}
+
+.tab-event {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+}
+
+.tab-event-head,
+.tab-event-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab-event-options {
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.tab-event input[type='color'] {
+  width: 36px;
+  height: 22px;
+  padding: 1px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+}
+
+/* A color that follows another event */
+.tab-event input[type='color'].unset {
+  border-style: dashed;
+}
+
+.tab-event input:disabled {
+  opacity: 0.4;
+}
+
+.tab-sample {
+  display: flex;
+  flex: none;
+  background: var(--chrome);
+}
+
+.tab-sample .tab {
+  margin: 0;
+  padding: 2px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.tab-event .field-help {
+  margin: 0;
+  font-size: calc(11px * var(--font-scale));
+}
+
 /* Small screens. Keep the query in sync with lib/useIsMobile.ts */
 
 @media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
@@ -2364,6 +2437,15 @@ textarea.notes {
   .drawer li.mention {
     background: var(--tab-mention-bg);
     color: var(--tab-mention-text, var(--text));
+  }
+
+  .drawer li.event:not(.active) {
+    background: var(--event-bg);
+    color: var(--event-text);
+  }
+
+  .drawer li.event:not(.active) .drawer-window {
+    font-weight: var(--event-weight);
   }
 
   .drawer li.active {

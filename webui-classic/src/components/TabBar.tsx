@@ -3,12 +3,15 @@ import { useEffect, useRef } from 'react';
 import { closeWindow } from '../actions';
 import { windowMenu } from '../actions/mainMenu';
 import { useDragTabs } from '../lib/useDragTabs';
+import { tabEventStyle } from '../lib/tabEvents';
 import { windowInfo } from '../lib/windows';
 import { activate, useApp } from '../store/app';
+import { colorsDoc, useDoc } from '../store/docs';
 import { openMenu } from '../store/ui';
 
 export const TabBar = () => {
   const state = useApp();
+  const { highlight } = useDoc(colorsDoc);
   const bar = useRef<HTMLDivElement>(null);
   const { dragged, onPointerDown } = useDragTabs(bar);
 
@@ -26,13 +29,16 @@ export const TabBar = () => {
       }}
     >
       {state.tabs.map((key) => {
-        const info = windowInfo(key, state);
+        const info = windowInfo(key, state, highlight);
         const selected = key === state.active;
+        const event = selected ? undefined : info.event;
         return (
           <div
             key={key}
-            className={`tab${selected ? ' active' : ''}${!selected && info.attention ? ` ${info.attention}` : ''}${key === dragged ? ' dragged' : ''}`}
+            className={`tab${selected ? ' active' : ''}${!selected && info.attention ? ` ${info.attention}` : ''}${event ? ' event' : ''}${key === dragged ? ' dragged' : ''}`}
+            style={event && tabEventStyle(event)}
             data-key={key}
+            data-event={event}
             title={dragged ? undefined : (info.detail ?? info.title)}
             onPointerDown={(e) => onPointerDown(e, key)}
             // Middle click closes the window

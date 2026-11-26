@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { windowId, windowType, type AppState } from '../store/app';
-import { unreadCount } from '../store/useSession';
+import { colorsDoc } from '../store/docs';
+import { currentTabEvent, type TabEventId, type TabHighlights } from './tabEvents';
 
 export type Attention = 'mention' | 'unread' | null;
 
@@ -25,13 +26,19 @@ export interface WindowInfo {
   title: string;
   icon: ReactNode;
   attention: Attention;
+  /** Chats: what has happened, which decides how the tab looks */
+  event?: TabEventId;
   /** Shown as a tooltip */
   detail?: string;
 }
 
 const ICON = 14;
 
-export const windowInfo = (key: string, state: AppState): WindowInfo => {
+export const windowInfo = (
+  key: string,
+  state: AppState,
+  highlight: TabHighlights = colorsDoc.value.highlight,
+): WindowInfo => {
   const id = windowId(key);
   switch (windowType(key)) {
     case 'home':
@@ -54,21 +61,24 @@ export const windowInfo = (key: string, state: AppState): WindowInfo => {
       return { title: 'Transfers', icon: <ArrowDownUp size={ICON} className="i-up" />, attention: null };
     case 'hub': {
       const hub = state.hubs.find((h) => String(h.id) === id);
-      const counts = hub?.message_counts.unread;
+      const event = currentTabEvent('hub', hub?.message_counts.unread, highlight);
       return {
         title: hub?.identity.name || hub?.hub_url || 'Hub',
         detail: hub && `${hub.hub_url}: ${hub.connect_state.str}`,
         icon: <Server size={ICON} className={`i-hub ${hub?.connect_state.id ?? ''}`} />,
-        attention: counts?.mention ? 'mention' : counts?.user || counts?.bot ? 'unread' : null,
+        attention: event?.level ?? null,
+        event: event?.id,
       };
     }
     case 'pm': {
       const chat = state.chats.find((c) => c.id === id);
+      const event = currentTabEvent('pm', chat?.message_counts.unread, highlight);
       return {
         title: chat?.user.nicks ?? 'Private message',
         detail: chat?.user.hub_names,
         icon: <MessageSquare size={ICON} className={`i-pm${chat?.user.flags.includes('offline') ? ' offline' : ''}`} />,
-        attention: chat?.message_counts.unread.user || chat?.message_counts.unread.bot ? 'mention' : unreadCount(chat?.message_counts) ? 'unread' : null,
+        attention: event?.level ?? null,
+        event: event?.id,
       };
     }
     case 'filelist': {

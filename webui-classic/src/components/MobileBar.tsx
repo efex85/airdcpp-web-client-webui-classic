@@ -3,15 +3,20 @@ import { EllipsisVertical, Menu as MenuIcon, X } from 'lucide-react';
 import { useState } from 'react';
 import { closeWindow } from '../actions';
 import { MAIN_MENU, windowMenu } from '../actions/mainMenu';
+import { tabEventStyle } from '../lib/tabEvents';
 import { windowInfo } from '../lib/windows';
 import { activate, useApp } from '../store/app';
+import { colorsDoc, useDoc } from '../store/docs';
 import { openMenu } from '../store/ui';
 
 export const MobileBar = () => {
   const state = useApp();
+  const { highlight } = useDoc(colorsDoc);
   const [open, setOpen] = useState(false);
-  const info = state.active ? windowInfo(state.active, state) : null;
-  const others = state.tabs.filter((key) => key !== state.active).map((key) => windowInfo(key, state).attention);
+  const info = state.active ? windowInfo(state.active, state, highlight) : null;
+  const others = state.tabs
+    .filter((key) => key !== state.active)
+    .map((key) => windowInfo(key, state, highlight).attention);
   const attention = others.includes('mention') ? 'mention' : others.includes('unread') ? 'unread' : null;
 
   return (
@@ -62,9 +67,15 @@ export const MobileBar = () => {
             </div>
             <ul>
               {state.tabs.map((key) => {
-                const tab = windowInfo(key, state);
+                const tab = windowInfo(key, state, highlight);
+                const event = key === state.active ? undefined : tab.event;
                 return (
-                  <li key={key} className={`${key === state.active ? 'active' : ''} ${tab.attention ?? ''}`}>
+                  <li
+                    key={key}
+                    className={`${key === state.active ? 'active' : ''} ${tab.attention ?? ''}${event ? ' event' : ''}`}
+                    style={event && tabEventStyle(event)}
+                    data-event={event}
+                  >
                     <button
                       type="button"
                       className="drawer-window"

@@ -63,7 +63,7 @@ describe('colors', () => {
   it('accepts only known colors and sets', () => {
     expect(
       sanitizeColors({ preset: 'constructor', colors: { nick_op: '#abcdef', nick_bot: 'url(x)', other: '#000000' }, bold: { nick_op: false, ui_bg: true } }),
-    ).toEqual({ preset: 'classic', colors: { nick_op: '#abcdef' }, bold: { nick_op: false } });
+    ).toEqual({ preset: 'classic', colors: { nick_op: '#abcdef' }, bold: { nick_op: false }, highlight: {} });
   });
 
   it('applies own colors on top of the set', () => {

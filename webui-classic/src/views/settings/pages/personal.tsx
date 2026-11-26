@@ -19,7 +19,7 @@ import { confirm } from '../../../store/ui';
 import type { SyncedDoc } from '../../../lib/syncedDoc';
 import { Note, Page, Section } from '../form';
 
-const SyncNote = <T,>({ doc }: { doc: SyncedDoc<T> }) => {
+export const SyncNote = <T,>({ doc }: { doc: SyncedDoc<T> }) => {
   const status = useDocStatus(doc);
   return (
     <Note>
@@ -86,25 +86,26 @@ export const TextPage = () => {
   );
 };
 
-const change = (update: (colors: ColorSettings) => ColorSettings) => colorsDoc.set(update(colorsDoc.value));
+export const change = (update: (colors: ColorSettings) => ColorSettings) => colorsDoc.set(update(colorsDoc.value));
 
-const without = <T,>(record: Record<string, T>, key: string) => {
+export const without = <T,>(record: Record<string, T>, key: string) => {
   const next = { ...record };
   delete next[key];
   return next;
 };
 
 const choosePreset = async (preset: string) => {
-  const { colors, bold } = colorsDoc.value;
+  const { colors, bold, highlight } = colorsDoc.value;
   const own = Object.keys(colors).length + Object.keys(bold).length;
   if (own && !(await confirm('Change the color set', 'Your own color choices are replaced. Continue?', 'Replace'))) {
     return;
   }
 
-  colorsDoc.set({ ...DEFAULT_COLORS, preset });
+  // Which events mark a tab isn't a matter of colors
+  colorsDoc.set({ ...DEFAULT_COLORS, preset, highlight });
 };
 
-const ColorRow = ({ def, settings }: { def: ColorDefinition; settings: ColorSettings }) => {
+export const ColorRow = ({ def, settings }: { def: ColorDefinition; settings: ColorSettings }) => {
   const value = colorOf(settings, def.key);
   const changed = def.key in settings.colors || def.key in settings.bold;
   return (
@@ -197,7 +198,8 @@ const Preview = () => (
 
 export const ColorsPage = () => {
   const settings = useDoc(colorsDoc);
-  const groups = [...new Set(COLOR_DEFINITIONS.map((d) => d.group))];
+  // The colors of the tabs have a page of their own
+  const groups = [...new Set(COLOR_DEFINITIONS.map((d) => d.group))].filter((group) => group !== 'Tabs');
   const own = Object.keys(settings.colors).length + Object.keys(settings.bold).length > 0;
 
   return (
@@ -216,6 +218,7 @@ export const ColorsPage = () => {
           Remove my own colors
         </button>
       </div>
+      <Note>The colors of marked tabs are chosen on the page “Tab highlights”.</Note>
       <Preview />
       {groups.map((group) => (
         <Fragment key={group}>

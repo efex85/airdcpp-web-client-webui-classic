@@ -1,5 +1,7 @@
 // The colors that can be changed and the ready-made color sets
 
+import { TAB_EVENTS, type TabHighlights } from './tabEvents';
+
 export type ColorGroup = 'Nicknames' | 'Tabs' | 'Chat' | 'Shared, queued and downloaded items' | 'Interface';
 
 export interface ColorDefinition {
@@ -42,11 +44,21 @@ export const COLOR_DEFINITIONS: ColorDefinition[] = [
   }),
   color('Nicknames', 'nick_ignored', 'Ignored users', '--nick-ignored', { optional: 'No color of their own', bold: false }),
 
-  color('Tabs', 'tab_unread_bg', 'New messages: background', '--tab-unread-bg'),
-  color('Tabs', 'tab_unread_text', 'New messages: text', '--tab-unread-text', { optional: 'Same as the text' }),
-  color('Tabs', 'tab_mention_bg', 'Mention or private message: background', '--tab-mention-bg'),
-  color('Tabs', 'tab_mention_text', 'Mention or private message: text', '--tab-mention-text', {
-    optional: 'Same as the text',
+  // The tabs: a background (which also has the bold choice) and a text color for every event
+  ...TAB_EVENTS.flatMap((event) => {
+    const name = `${event.place === 'hub' ? 'Hub chat' : 'Private chat'}, ${event.label.toLowerCase()}`;
+    // Only the first two have colors of their own in the color sets
+    const optional = event.fallback ? { optional: 'Same as another event' } : {};
+    const css = `--${event.colors.replaceAll('_', '-')}`;
+    return [
+      color('Tabs', `${event.colors}_bg`, `${name}: background`, `${css}-bg`, {
+        // Tabs of mentions and private messages are bold unless that is switched off
+        bold: event.level === 'mention',
+        weight: 600,
+        ...optional,
+      }),
+      color('Tabs', `${event.colors}_text`, `${name}: text`, `${css}-text`, { optional: 'Same as the text' }),
+    ];
   }),
   color('Tabs', 'dot_unread', 'Phone menu dot: new messages', '--dot-unread'),
   color('Tabs', 'dot_mention', 'Phone menu dot: mention', '--dot-mention'),
@@ -200,9 +212,11 @@ export interface ColorSettings {
   colors: Record<string, string>;
   /** Bold choices that differ from the default */
   bold: Record<string, boolean>;
+  /** Which events mark a tab, where it differs from the default */
+  highlight: TabHighlights;
 }
 
-export const DEFAULT_COLORS: ColorSettings = { preset: 'classic', colors: {}, bold: {} };
+export const DEFAULT_COLORS: ColorSettings = { preset: 'classic', colors: {}, bold: {}, highlight: {} };
 
 const isColor = (value: unknown): value is string => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
 
@@ -220,6 +234,12 @@ export const sanitizeColors = (value: unknown): ColorSettings => {
     preset: Object.hasOwn(PRESETS, source.preset) ? source.preset : 'classic',
     colors: pick<string>(source.colors, (_, v) => isColor(v)),
     bold: pick<boolean>(source.bold, (def, v) => def.bold !== undefined && typeof v === 'boolean'),
+    highlight: Object.fromEntries(
+      TAB_EVENTS.flatMap((event) => {
+        const v = source.highlight?.[event.id];
+        return typeof v === 'boolean' ? [[event.id, v]] : [];
+      }),
+    ),
   };
 };
 

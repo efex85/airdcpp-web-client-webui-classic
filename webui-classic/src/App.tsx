@@ -10,6 +10,7 @@ import { Toolbar } from './components/Toolbar';
 import { windowInfo } from './lib/windows';
 import { useIsMobile } from './lib/useIsMobile';
 import { useApp, windowId, windowType } from './store/app';
+import { colorsDoc, useDoc } from './store/docs';
 import { useLocalSettings } from './store/localSettings';
 import { logout } from './store/session';
 import { FavoriteHubs } from './views/FavoriteHubs';
@@ -82,13 +83,14 @@ const Windows = () => {
 };
 
 const useDocumentTitle = () => {
+  const { highlight } = useDoc(colorsDoc);
   const title = useApp((s) => {
     if (!s.login || !s.active) {
       return 'AirDC++ Classic';
     }
 
-    const mention = s.tabs.some((key) => key !== 'syslog' && windowInfo(key, s).attention === 'mention');
-    return `${mention ? '(*) ' : ''}${windowInfo(s.active, s).title} - AirDC++ Classic`;
+    const mention = s.tabs.some((key) => key !== 'syslog' && windowInfo(key, s, highlight).attention === 'mention');
+    return `${mention ? '(*) ' : ''}${windowInfo(s.active, s, highlight).title} - AirDC++ Classic`;
   });
 
   useEffect(() => {

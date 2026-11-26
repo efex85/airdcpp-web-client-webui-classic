@@ -20,6 +20,7 @@ import {
 } from './pages/downloads';
 import { CatalogPage, ExtensionEnginesPage, ExtensionOptionsPage, ExtensionsPage } from './pages/extensions';
 import { ColorsPage, StartupPage, TextPage } from './pages/personal';
+import { TabsPage } from './pages/tabs';
 import { AwayPage, IgnoredUsersPage, MiscPage, UserPage } from './pages/profile';
 import {
   ExcludesPage,
@@ -126,6 +127,7 @@ export const PAGE_GROUPS: PageGroup[] = [
     [
       ['startup', 'Home and startup', StartupPage, null],
       ['colors', 'Colors', ColorsPage, null],
+      ['tabs', 'Tab highlights', TabsPage, null],
       ['text', 'Text and chat', TextPage, null],
       ['notifications', 'Notifications', NotificationsPage, null],
       ['histories', 'Histories', HistoriesPage],
