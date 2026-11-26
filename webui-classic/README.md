@@ -71,27 +71,60 @@ With room for three columns, the order *A, B (tall), C, D, E* gives A and D stac
 and C and E stacked on the right. Use **Move earlier** and **Move later** to change the order. The number of
 columns depends on the width of the window; a phone shows one.
 
+On a **phone** the boxes size themselves: each is as high as its content, at most the normal height, and longer
+feeds and notes scroll inside their box. The heights chosen under **⋮ → Height** only apply to larger screens. They
+are kept when you use a phone, and can also be changed there.
+
 ## Searching
 
 A search window opened from a feed entry, "Search for alternates" and the like starts its search by itself. If no
 hub is connected, it starts as soon as one is. Hubs limit how often one may search, so the client may have to
 queue a search; the window then counts down until it is sent.
 
+On a **phone**, **Search options** next to the Search button shows the file type, sizes, excluded words and hubs.
+While they are open they use the whole window. Search, or tap Search options again, to get back to the results.
+
 ## Colors and text
 
 - **Colors**: ready-made color sets, and your own colors for nicknames (yours, operators, bots, other, favorite
-  and ignored users; also bold or not), tabs with new messages or mentions, chats, shared, queued and downloaded
-  items, and the interface itself. The color for favorite users applies to users that are already favorites in
-  the configuration of the client; this interface can't add favorite users.
+  and ignored users; also bold or not), chats, shared, queued and downloaded items, and the interface itself.
+  The color for favorite users applies to users that are already favorites in the configuration of the client;
+  this interface can't add favorite users.
+- **Tab highlights**: how the tabs of chats are marked, see below.
 - **Text and chat**: text size of the interface and of chats, chat font and timestamp format. List columns
   become wider or narrower with the text size.
+
+## Tab highlights
+
+Under **Settings → View → Tab highlights** each of these events can mark the tab of its chat or not, with its own
+background color, text color and bold text. On a phone the entry in the list of windows is marked in the same way.
+
+| Chat    | Event                                  | Marks by default | Colors until you set them         |
+|---------|----------------------------------------|------------------|-----------------------------------|
+| Hub     | My nick is mentioned                   | yes, bold        | its own, from the color set       |
+| Hub     | Someone writes                         | yes              | its own, from the color set       |
+| Hub     | A bot writes                           | yes              | as "Someone writes"               |
+| Hub     | Status message                         | no               | as "Someone writes"               |
+| Hub     | Joins, parts and other detail messages | no               | as "Someone writes"               |
+| Private | Someone writes                         | yes, bold        | as a mention in a hub             |
+| Private | A bot writes                           | yes, bold        | as "Someone writes" (private)     |
+| Private | Status message                         | yes              | as "Someone writes" (hub)         |
+
+- A tab is marked while another window is shown. If several events have happened, the first one in the table that
+  is switched on decides how the tab looks.
+- Joins and parts only count when the hub shows them in its chat.
+- A marked mention or private message also puts "(*)" in the title of the page and gives the menu button on phones
+  the color for mentions. Switching the event off removes these marks too. The two colors of that dot are chosen
+  on the same page.
+- The system log, file lists and viewed files use the colors of "My nick is mentioned" and "Someone writes".
+- Notifications are not affected. They are set under **Settings → View → Notifications**.
 
 ## Synced and per browser
 
 | Same on all devices of a web user                      | Stored in each browser                                                |
 |--------------------------------------------------------|-----------------------------------------------------------------------|
 | Home widgets, feeds and notes                          | text sizes, chat font, timestamps                                     |
-| colors                                                 | notifications and the other browser settings                          |
+| colors and tab highlights                              | notifications and the other browser settings                          |
 | "Show the Home tab", "Open the system log …"           | tab order, column widths, pane sizes, whether the transfer pane shows |
 
 Synced data is stored by the client in `WebUserData.json` in its configuration directory. It isn't encrypted.

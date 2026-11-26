@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # The image is based on Debian, for building and for running the daemon. The web UI is the Classic UI in
-# webui-classic/. Build with ./build.sh, or:  docker build -t airdcpp-webclient-mod-xl .
+# webui-classic/. Build with ./build.sh, or:  docker build -t airdcpp-web-client-webui-classic .
 # The release is named (rather than "stable-slim") so that a new Debian release doesn't change the build by itself.
 ARG distro=trixie-slim
 
@@ -66,7 +66,8 @@ FROM debian:${distro}
 # Runtime library packages, worked out in stage 2
 COPY --from=daemon-build /runtime-deps.txt /tmp/runtime-deps.txt
 
-# Changes on every build (see build.sh); makes sure that the package/Node.js installation layer is never reused from cache
+# For builds that use the cache: a new value (--build-arg CACHEBUST=...) makes sure that the package/Node.js
+# installation layer is not reused. build.sh builds without any cache.
 ARG CACHEBUST=0
 
 RUN installDeps=' \

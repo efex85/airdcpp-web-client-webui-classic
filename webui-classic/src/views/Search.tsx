@@ -356,7 +356,7 @@ export const SearchView = ({ tabKey, active }: { tabKey: string; active: boolean
 
   return (
     <form
-      className="view search"
+      className={mobile && showOptions ? 'view search options-open' : 'view search'}
       onSubmit={(e) => {
         e.preventDefault();
         run();

@@ -37,13 +37,13 @@ describe('chat commands', () => {
 });
 
 describe('nick completion', () => {
-  const nicks = ['[SRA]Nathan', 'natalie', 'Other'];
+  const nicks = ['[TAG]Natasha', 'natalie', 'Other'];
 
   it('prefers full prefix matches, ignores leading tags and cycles', () => {
     const first = completeNick('nat', 3, nicks)!;
     expect(first.text).toBe('natalie: ');
     const second = completeNick(first.text, first.caret, nicks, first.next)!;
-    expect(second.text).toBe('[SRA]Nathan: ');
+    expect(second.text).toBe('[TAG]Natasha: ');
     expect(completeNick(second.text, second.caret, nicks, second.next)!.text).toBe('natalie: ');
   });
 
@@ -113,7 +113,7 @@ describe('paths and formatting', () => {
 });
 
 describe('user filter', () => {
-  const user = { nick: 'Nathan', description: 'friend', tag: '<AirDC++>', ip4: { ip: '10.0.0.1' } } as OnlineUser;
+  const user = { nick: 'Heather', description: 'friend', tag: '<AirDC++>', ip4: { ip: '10.0.0.1' } } as OnlineUser;
 
   it('matches by field and method', () => {
     expect(userMatcher('ath', 'any', 'partial')!(user)).toBe(true);

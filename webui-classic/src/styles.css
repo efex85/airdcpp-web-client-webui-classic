@@ -1157,7 +1157,7 @@ textarea[aria-invalid='true'] {
   border-right: 1px solid var(--border);
 }
 
-/* The search field on a row of its own, with the button below it to the right */
+/* The search field on a row of its own, with the buttons below it to the right */
 .search-main {
   display: flex;
   flex-direction: column;
@@ -1172,10 +1172,6 @@ textarea[aria-invalid='true'] {
   display: flex;
   justify-content: flex-end;
   gap: 4px;
-}
-
-.search-actions .search-options {
-  margin-right: auto;
 }
 
 .search-panel fieldset {
@@ -2115,6 +2111,13 @@ fieldset.field {
   font-size: calc(11px * var(--font-scale));
 }
 
+.notes-box {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
 textarea.notes {
   flex: 1;
   min-height: 0;
@@ -2491,9 +2494,21 @@ textarea.notes {
 
   .search-panel {
     flex: 0 0 auto;
-    max-height: 60%;
     border-right: 0;
     border-bottom: 1px solid var(--border-strong);
+  }
+
+  /* Open options get the whole window. The results keep their place (and scroll position) without taking room. */
+  .view.search.options-open .search-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    border-bottom: 0;
+  }
+
+  .view.search.options-open .search-results {
+    flex: 0 0 0;
+    overflow: hidden;
+    visibility: hidden;
   }
 
   .view-buttons {
@@ -2537,6 +2552,53 @@ textarea.notes {
 
   .menu-item {
     min-height: 42px;
+  }
+
+  /* Each box is as high as its content, at most the normal height. The taller heights are for computers. */
+  .home-grid {
+    grid-auto-rows: max-content;
+    align-items: start;
+  }
+
+  .widget.rows-2,
+  .widget.rows-3 {
+    grid-row: auto;
+  }
+
+  .widget-rss,
+  .widget-notes {
+    contain: none;
+    max-height: min(calc(340px * var(--font-scale)), 70vh);
+    max-height: min(calc(340px * var(--font-scale)), 70dvh);
+  }
+
+  .widget-scroll,
+  .widget-setup,
+  .notes-box {
+    flex: 0 1 auto;
+  }
+
+  /* A text field doesn't grow with its text: an invisible copy of the text in the same place sets the height */
+  .notes-box {
+    display: grid;
+    grid-template: minmax(0, auto) / minmax(0, 1fr);
+    min-height: calc(90px * var(--font-scale));
+  }
+
+  .notes-box::after {
+    content: attr(data-value) ' ';
+    visibility: hidden;
+    overflow: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    font-size: max(16px, calc(16px * var(--font-scale)));
+  }
+
+  .notes-box::after,
+  textarea.notes {
+    grid-area: 1 / 1;
+    padding: 6px 8px;
+    line-height: 1.45;
   }
 
   /* Wide enough to tap */

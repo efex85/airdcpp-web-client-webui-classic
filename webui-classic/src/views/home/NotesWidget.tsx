@@ -9,15 +9,18 @@ export const NotesWidget = ({ id, title }: { id: string; title: string }) => {
 
   return (
     <>
-      <textarea
-        className="notes"
-        aria-label={title}
-        placeholder="Write your notes here"
-        value={text}
-        maxLength={MAX_NOTE_LENGTH}
-        onChange={(e) => setNote(id, e.target.value)}
-        onBlur={() => void doc.flush()}
-      />
+      {/* On phones the box is as high as its text, which the style sheet measures with a copy of it */}
+      <div className="notes-box" data-value={text}>
+        <textarea
+          className="notes"
+          aria-label={title}
+          placeholder="Write your notes here"
+          value={text}
+          maxLength={MAX_NOTE_LENGTH}
+          onChange={(e) => setNote(id, e.target.value)}
+          onBlur={() => void doc.flush()}
+        />
+      </div>
       <div className="widget-footer">
         <span className="muted grow" data-status={status}>
           {status === 'synced' ? (text ? 'Saved' : '') : status === 'pending' ? 'Not saved yet…' : 'Saved in this browser only'}

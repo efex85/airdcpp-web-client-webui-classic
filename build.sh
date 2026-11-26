@@ -1,14 +1,19 @@
 #!/bin/sh
-# Builds the Debian based image (daemon and the Classic UI), tagged with the date and
-# time of the build and as "latest". The image stays local; nothing is pushed.
+# Builds the Debian based image (daemon and the Classic UI) from scratch, without the Docker layer cache.
+# The image is tagged with the date and time of the build. It is not uploaded anywhere.
 #
 #   ./build.sh
 #
-# The defaults can be changed with environment variables, e.g.  IMAGE=test ./build.sh
+# The name and the tag can be changed with environment variables, e.g.  TAG=test ./build.sh
 set -eu
 
 IMAGE="${IMAGE:-airdcpp-web-client-webui-classic}"
 TAG="${TAG:-$(date +%Y%m%d-%H%M)}"
+
+if [ "$#" -ne 0 ]; then
+  echo "Usage: $0   (no options)" >&2
+  exit 1
+fi
 
 cd "$(dirname "$0")"
 
@@ -37,15 +42,8 @@ if ! docker info >/dev/null 2>&1; then
   exit 1
 fi
 
-NAME="$IMAGE"
+echo "==> Building $IMAGE:$TAG"
 
-echo "==> Building $NAME:$TAG (also :latest)"
+docker build --no-cache -t "$IMAGE:$TAG" .
 
-# CACHEBUST only affects the final stage (package/Node.js install), so the slow daemon compile
-# is reused from the Docker layer cache when the Dockerfile and patches haven't changed.
-docker build \
-  --build-arg CACHEBUST="$(date +%s)" \
-  -t "$NAME:$TAG" \
-  -t "$NAME:latest" .
-
-echo "==> Done. Built $NAME:$TAG and $NAME:latest"
+echo "==> Done. Built $IMAGE:$TAG"
