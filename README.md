@@ -1,6 +1,6 @@
 # AirDC++ Web Client mod-xl
 
-A Debian based Docker image of AirDC++ Web Client with:
+A Debian based Docker image of AirDC++ Web Client WebUI Classic
 
 1. **AirDC++ Classic**, a web UI that looks and works like a desktop client – `webui-classic/`.
    It is the only web UI of the image; the standard web UI is not included.
