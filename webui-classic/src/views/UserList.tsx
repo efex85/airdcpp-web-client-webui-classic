@@ -1,6 +1,6 @@
 import { Bot, Shield, User } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { browseUser, grantSlot, matchQueue, userMenu } from '../actions';
+import { grantSlot, matchQueue, openUser, userMenu } from '../actions';
 import { remoteMenu } from '../actions/menus';
 import type { OnlineUser } from '../api/types';
 import { DataTable, type Column, type RowMenu } from '../components/DataTable';
@@ -106,7 +106,7 @@ export const UserList = ({ hubId, users }: { hubId: number; users: OnlineUser[] 
         groupOf={groupOf}
         defaultSort={{ column: 'nick', desc: false }}
         menu={menu}
-        onActivate={(u) => !u.flags.includes('self') && void browseUser(toHinted(u))}
+        onActivate={(u) => !u.flags.includes('self') && void openUser(toHinted(u))}
         mobileTap="menu"
         empty={users.length ? 'No matching users' : 'No users'}
       />

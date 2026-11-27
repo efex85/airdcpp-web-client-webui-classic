@@ -1,0 +1,16 @@
+diff --git a/airdcpp-core/airdcpp/connection/ConnectionManager.cpp b/airdcpp-core/airdcpp/connection/ConnectionManager.cpp
+index e8fa7a14..b2cbbceb 100644
+--- a/airdcpp-core/airdcpp/connection/ConnectionManager.cpp
++++ b/airdcpp-core/airdcpp/connection/ConnectionManager.cpp
+@@ -387,6 +387,11 @@ void ConnectionManager::attemptDownloads(uint64_t aTick, StringList& removedToke
+ 		// No attempts?
+ 		if (cqi->getErrors() == -1 && cqi->getLastAttempt() != 0) {
+ 			// protocol error, don't reconnect except after a forced attempt
++			// The item must still be removed once there is nothing left to download from the user,
++			// as it would otherwise stay in the transfer list until the user goes offline
++			if (!QueueManager::getInstance()->startDownload(cqi->getUser(), QueueDownloadType::ANY).hasDownload) {
++				removedTokens_.push_back(cqi->getToken());
++			}
+ 			continue;
+ 		}
+ 

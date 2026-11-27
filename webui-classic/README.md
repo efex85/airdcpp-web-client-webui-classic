@@ -4,7 +4,7 @@ The web UI of this image: a UI for [AirDC++ Web Client](https://airdcpp-web.gith
 classic desktop DC client: menu bar, toolbar, window tabs at the bottom, sortable lists with right-click menus, a transfer
 pane and a status bar. Dark theme. It talks to the daemon through its Web API; the system uptime, the syncing
 between devices and the emoticon packs need three small daemon patches of this image (see the
-[main README](../README.md)).
+[main README](../README.md), which also describes its other daemon changes).
 
 ## What is included
 
@@ -265,6 +265,16 @@ needs a client that supports this kind of search.
 
 **Browse…** under **Download to** opens a folder browser that starts in the folder chosen last time. Web users who
 may not browse the files of the server type the folder instead.
+
+## Users and bots
+
+Double-clicking a user in a user list (or pressing Enter on one) opens the user's file list. For a **bot** it opens a
+private chat instead, as bots normally share nothing; **Get file list** stays in its menu. The entry in bold is what a
+double click does. On a phone, tapping a user opens this menu. A user counts as a bot when the hub says so.
+
+A transfer to a user who can't be connected to stays in the transfer list, with the reason, as long as something is
+queued from that user. **Remove file from queue** or **Remove user from queue** in its menu, or closing the file list,
+makes it go away (this needs `daemon-failed-connections.patch`, see the [main README](../README.md#failed-transfers)).
 
 ## Own file list
 

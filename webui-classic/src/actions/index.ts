@@ -132,6 +132,10 @@ export const browseUser = async (user: HintedUser, directory = '/') => {
   }
 };
 
+/** What a double click on a user does: bots have no files, so they get a private chat */
+export const openUser = (user: HintedUser) =>
+  user.flags.includes('bot') ? openPrivateChat(user) : browseUser(user);
+
 export const openOwnList = async () => {
   try {
     const profiles = await socket.get<{ id: number; str?: string; name?: string; default?: boolean }[]>('share_profiles');
@@ -203,9 +207,11 @@ export const userMenu = (user: HintedUser): MenuEntry[] => {
   const self = user.flags.includes('self');
   const offline = user.flags.includes('offline');
   const ignored = user.flags.includes('ignored');
+  const bot = user.flags.includes('bot');
+  // The entry in bold is what a double click does
   return [
-    { label: 'Get file list', bold: true, disabled: offline || self, onClick: () => void browseUser(user) },
-    { label: 'Send private message', disabled: offline || self, onClick: () => void openPrivateChat(user) },
+    { label: 'Get file list', bold: !bot, disabled: offline || self, onClick: () => void browseUser(user) },
+    { label: 'Send private message', bold: bot, disabled: offline || self, onClick: () => void openPrivateChat(user) },
     { label: 'Match queue', disabled: offline || self, onClick: () => void matchQueue(user) },
     'separator',
     { label: 'Grant extra slot', disabled: self, onClick: () => void grantSlot(user) },
