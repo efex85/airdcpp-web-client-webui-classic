@@ -15,7 +15,7 @@ between devices and the emoticon packs need three small daemon patches of this i
 | User list        | operators/bots/users groups, column sorting and selection, filter, hub user commands                                                                    |
 | Private messages | including the transport encryption state                                                                                                                |
 | Search           | type, size and excluded words, hub selection, sources of grouped results, view a file or find the NFO of a folder                                       |
-| File lists       | folder tree, download to favorite folders or any folder, item details, view files, Find NFO, own list per share profile, "Refresh in share"             |
+| File lists       | folder tree, filter, download to favorite folders or any folder, item details, view files, Find NFO, own list per share profile, "Refresh in share"     |
 | Viewed files     | text and NFO files, images, audio and video, one window each                                                                                            |
 | Download queue   | priorities, pause and resume all, files and sources of a bundle, remove a user, rescan or force in share after a failed content check, remove completed |
 | Transfers        | window and optional bottom pane; remove a file or a user from the queue                                                                                 |
@@ -220,6 +220,7 @@ written as the character itself. On NMDC hubs such characters get lost unless th
 | colors, tab highlights and emoji                       | notifications and the other browser settings                          |
 | keyboard shortcuts and thumb buttons                   |                                                                       |
 | "Show the Home tab", "Open the system log …"           | tab order, column widths, pane sizes, whether the transfer pane shows |
+|                                                        | the Queued and Shared boxes and the options of the file list filter   |
 
 Synced data is stored by the client in `WebUserData.json` in its configuration directory. It isn't encrypted.
 If two devices change the same note before seeing each other's text, both versions are kept in the note. With a
@@ -239,6 +240,41 @@ shared folder by its name in the file list; a name with several folders opens a 
 or all. The same choices are in the **File** menu (on a phone: menu button → File → Refresh folder). Single folders
 can also be refreshed under **Settings → Sharing → Shared folders**. Refreshing requires the permission to edit
 the share.
+
+## Filtering a file list
+
+The bar of a file list filters the folder that is shown, like the one of the Windows client: the text, the column to
+search (**Any** by default), the match type, the **Queued** and **Shared** boxes and **Options...**. The status line
+shows how many of the items are listed, for example `2/7`. Rows that are filtered away are not selected by Ctrl+A.
+
+| Match type    | Shows the items where the column …                                                          |
+|---------------|---------------------------------------------------------------------------------------------|
+| Partial match | contains every word of the text, in any order                                               |
+| RegEx         | matches the regular expression; upper and lower case matter                                 |
+| Wildcard      | matches as a whole, with `*` for any text, `?` for one character and `\|` between choices   |
+| Exact match   | is the text                                                                                 |
+| `=` `>=` `<=` `>` `<` `!=` | compares as a number; for **Exact size**, **Size**, **Date** and **Any**       |
+
+Apart from RegEx, upper and lower case don't matter. With **Any**, one of the columns has to match, also the hidden
+**TTH** column.
+
+- An operator can be typed in front of the text, for example `>700 MiB` or `<7d`; the match type follows.
+- Sizes take `KiB`, `MiB`, `GiB`, `TiB`, `KB`, `MB`, `GB` and `TB`; without a unit they are bytes.
+- Dates are ages: `y` years, `m` months (30 days), `w` weeks, `d` days, `h` hours, `min` minutes and `s` seconds
+  (also without a unit). `>30d` means older than 30 days.
+- With **Any**, the unit decides whether sizes or dates are compared; a number without a unit matches nothing.
+- Unticking **Queued** hides what is queued or has been downloaded, unticking **Shared** hides what you share. Other
+  items are always listed. In your own file list the boxes don't apply.
+
+| Option                                       | Default | Does                                                       |
+|----------------------------------------------|---------|------------------------------------------------------------|
+| Exclude matches                              | off     | lists the items that don't match                           |
+| Show above the list                          | on      | off puts the bar below the files                           |
+| Reset the string when switching directory    | on      | empties the text in another folder                         |
+| Treat partial dupes similar to exact dupes   | off     | the two boxes also hide partial and mixed dupes            |
+
+The boxes and options apply to every file list and are remembered by the browser. The text, column and match type
+belong to the window.
 
 ## Viewing files
 

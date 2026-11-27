@@ -10,7 +10,7 @@ import {
   FolderSync,
   RefreshCw,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { copyText, openSearch, refreshInShare } from '../actions';
 import { directoryDownload, downloadAll, downloadMenu, fileDownload, type Downloadable } from '../actions/download';
 import { remoteMenu } from '../actions/menus';
@@ -21,14 +21,17 @@ import { showItemDetails } from '../components/ItemDetails';
 import { Splitter } from '../components/Splitter';
 import { useAccess } from '../lib/access';
 import { dupeClass } from '../lib/dupe';
+import { clearText, dupeShown, emptyFilter, filelistMatcher } from '../lib/filelistFilter';
 import { formatDate, formatSize } from '../lib/format';
 import { magnetLink } from '../lib/magnet';
 import { lastSegment, parentPath, pathChain } from '../lib/path';
 import { addDirectory, treeRows, type Tree } from '../lib/tree';
 import { useIsMobile } from '../lib/useIsMobile';
 import { reportError, useApp } from '../store/app';
+import { useFilterOptions } from '../store/filelistFilter';
 import { socket } from '../store/session';
 import { openMenu } from '../store/ui';
+import { FilelistFilterBar } from './FilelistFilterBar';
 
 const isDirectory = (item: FilelistItem) => item.type.id === 'directory';
 
@@ -65,6 +68,9 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set(['/']));
   const history = useRef<{ back: string[]; current?: string; returning: boolean }>({ back: [], returning: false });
   const [canGoBack, setCanGoBack] = useState(false);
+  const [filter, setFilter] = useState(emptyFilter);
+  const options = useFilterOptions();
+  const shownPath = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!path || state.id !== 'loaded') {
@@ -77,6 +83,13 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
       socket.get<{ list_path: string; items: FilelistItem[] }>(`filelists/${id}/items/0/100000`).then(
         (result) => {
           if (current) {
+            // The filter text belongs to the folder where it was typed, unless the options say otherwise
+            const switched = shownPath.current !== undefined && shownPath.current !== result.list_path;
+            if (switched && useFilterOptions.getState().resetOnChange) {
+              setFilter(clearText);
+            }
+
+            shownPath.current = result.list_path;
             setListing({ path: result.list_path, items: result.items });
             setTree((t) => addDirectory(t, result.list_path, result.items.filter(isDirectory)));
           }
@@ -179,7 +192,20 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
 
   // The previous directory stays visible while the next one is being loaded
   const loading = !listing || listing.path !== path || state.id !== 'loaded';
-  const items = listing?.items ?? [];
+  const items = listing?.items;
+  // Typing stays responsive in folders with very many files
+  const applied = useDeferredValue(filter);
+  const matcher = useMemo(() => filelistMatcher(applied, options.exclude), [applied, options.exclude]);
+  const shown = useMemo(
+    () =>
+      (items ?? []).filter(
+        // Everything in the own list is shared, so the dupe checkboxes don't apply to it
+        (i) => (own || dupeShown(i.dupe?.id, options)) && (!matcher || matcher(i)),
+      ),
+    [items, matcher, own, options.showShared, options.showQueued, options.partialDupes],
+  );
+  const total = items?.length ?? 0;
+  const counted = shown.length === total ? `${total}` : `${shown.length}/${total}`;
 
   const directoryTree = (
     <div className="tree" role="tree" aria-label="Folders">
@@ -226,7 +252,7 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
       id="filelist"
       label="Files"
       columns={COLUMNS}
-      items={items}
+      items={shown}
       itemKey={(i) => String(i.id)}
       icon={(i) => (isDirectory(i) ? <Folder size={13} className="i-folder" /> : <File size={13} />)}
       // Everything in the own list is shared, so there is nothing to point out
@@ -242,8 +268,17 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
         }
       }}
       mobileTap={(i) => (isDirectory(i) ? 'activate' : 'menu')}
-      empty={loading ? state.str : 'The folder is empty'}
+      empty={loading ? state.str : total ? 'No matching items' : 'The folder is empty'}
     />
+  );
+
+  const filterBar = <FilelistFilterBar filter={filter} onChange={setFilter} invalid={!matcher} own={own} />;
+  const files = (
+    <div className="filelist-files">
+      {options.onTop && filterBar}
+      {table}
+      {!options.onTop && filterBar}
+    </div>
   );
 
   return (
@@ -291,7 +326,7 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
       </div>
       <div className="view-main">
         {mobile ? (
-          table
+          files
         ) : (
           <Splitter
             id="filelistTree"
@@ -300,12 +335,12 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
             initial={260}
             min={120}
             first={directoryTree}
-            second={table}
+            second={files}
           />
         )}
       </div>
       <div className="view-status">
-        <span className="grow">{loading ? state.str : `${items.length} item(s) in this folder`}</span>
+        <span className="grow">{loading ? state.str : `${counted} item(s) in this folder`}</span>
         <span>
           {session.total_files > 0 && `${session.total_files} files, `}
           {session.total_size >= 0 && formatSize(session.total_size)}
