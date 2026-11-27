@@ -1,7 +1,7 @@
 // @ts-expect-error The project has no Node types; the test reads the stylesheet as a file
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { COLOR_DEFINITIONS, colorOf, DEFAULT_COLORS, isBold, PRESETS, resolveTheme, sanitizeColors } from '../src/lib/theme';
+import { COLOR_DEFINITIONS, colorOf, DEFAULT_COLORS, isBold, PRESETS, resolveTheme, sanitizeColors, scopedTheme } from '../src/lib/theme';
 
 const luminance = (hex: string) => {
   const [r, g, b] = [1, 3, 5].map((i) => {
@@ -86,5 +86,34 @@ describe('colors', () => {
     expect(theme.variables['--chrome-hover']).toBe('#38373e');
     expect(theme.variables['--op-weight']).toBe('600');
     expect(theme.variables['--bot-weight']).toBe('400');
+  });
+});
+
+describe('colors of a part of the page', () => {
+  it('sets every variable, so that nothing is inherited from the page', () => {
+    const scoped = scopedTheme(DEFAULT_COLORS);
+    for (const def of COLOR_DEFINITIONS) {
+      expect(scoped.variables).toHaveProperty([def.cssVar]);
+    }
+
+    expect(scoped.variables['--nick']).toBe('initial');
+    expect(scoped.variables['--nick-favorite']).toBe('initial');
+    // Without an own color, favorites look like other users, also in their boldness
+    expect(scoped.variables['--nick-favorite-weight']).toBe('initial');
+    expect(scoped.variables['--nick-weight']).toBe('400');
+    expect(scoped.classes).toEqual([]);
+  });
+
+  it('shows the chosen colors', () => {
+    const scoped = scopedTheme({
+      ...DEFAULT_COLORS,
+      colors: { nick_favorite: '#112233', ui_chrome: '#445566' },
+      bold: { nick_favorite: true },
+    });
+    expect(scoped.variables['--nick-favorite']).toBe('#112233');
+    expect(scoped.variables['--nick-favorite-weight']).toBe('700');
+    expect(scoped.variables['--chrome']).toBe('#445566');
+    expect(scoped.variables['--chrome-hover']).toContain('#445566');
+    expect(scoped.classes).toEqual(['custom-nick-favorite']);
   });
 });

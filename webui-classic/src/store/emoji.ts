@@ -10,6 +10,7 @@ import {
   parsePack,
   STANDARD_EMOTICONS,
   STANDARD_PICKER,
+  type EmojiSettings,
   type Emoticon,
   type EmoticonMatcher,
   type PickerGroup,
@@ -204,8 +205,10 @@ const STANDARD: ActiveEmoji = { matcher: createMatcher(STANDARD_EMOTICONS), pick
  * What chats use: null if emoji are switched off, or while a pack is being loaded. The emoji of the device are used
  * instead of a pack that can't be loaded.
  */
-export const useEmoji = (): { enabled: boolean; active: ActiveEmoji | null } => {
-  const { enabled, pack } = useDoc(emojiDoc);
+export const useEmoji = (): { enabled: boolean; active: ActiveEmoji | null } => useEmojiWith(useDoc(emojiDoc));
+
+/** The same for other than the saved settings (the preview of the settings page) */
+export const useEmojiWith = ({ enabled, pack }: EmojiSettings): { enabled: boolean; active: ActiveEmoji | null } => {
   const state = useEmojiStore((s) => (pack ? s.packs[pack] : undefined));
 
   useEffect(() => {

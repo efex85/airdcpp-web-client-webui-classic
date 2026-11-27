@@ -4,8 +4,11 @@ import { ApiError } from '../../api/socket';
 import type { SettingDefinition, SettingValues } from '../../api/settingsTypes';
 import { SettingFields } from '../../components/forms/SettingFields';
 import { useAccess } from '../../lib/access';
+import { equal, merge } from '../../lib/merge';
 import { changedValues, toEditValue } from '../../lib/settingsForm';
+import type { SyncedDoc } from '../../lib/syncedDoc';
 import { toast, useApp } from '../../store/app';
+import { useDoc } from '../../store/docs';
 import { socket } from '../../store/session';
 import { useSettingsNav } from '../../store/settingsNav';
 
@@ -29,6 +32,28 @@ export interface FormSource {
   disabled?: (key: string, values: SettingValues) => boolean;
   canSave: boolean;
 }
+
+/** What the bar with the save buttons needs to know about the settings of a page */
+export interface SaveState {
+  loaded: boolean;
+  loadError: string;
+  dirty: boolean;
+  saving: boolean;
+  error: { message: string } | null;
+  canSave: boolean;
+  save: () => Promise<void>;
+  revert: () => void;
+}
+
+const SAVED_MESSAGE = 'Settings were saved';
+
+/** Makes leaving the page ask first while there are unsaved changes */
+const useUnsavedChanges = (dirty: boolean) => {
+  useEffect(() => {
+    useSettingsNav.setState({ dirty });
+    return () => useSettingsNav.setState({ dirty: false });
+  }, [dirty]);
+};
 
 export const useForm = (source: FormSource) => {
   const generation = useApp((s) => s.generation);
@@ -83,10 +108,7 @@ export const useForm = (source: FormSource) => {
     : {};
   const dirty = Object.keys(changes).length > 0;
 
-  useEffect(() => {
-    useSettingsNav.setState({ dirty });
-    return () => useSettingsNav.setState({ dirty: false });
-  }, [dirty]);
+  useUnsavedChanges(dirty);
 
   const save = async () => {
     setSaving(true);
@@ -95,7 +117,7 @@ export const useForm = (source: FormSource) => {
       await sourceRef.current.save(changes);
       await reload();
       setEdits({});
-      toast('Settings were saved');
+      toast(SAVED_MESSAGE);
     } catch (e) {
       setError(e as ApiError);
     } finally {
@@ -124,6 +146,55 @@ export const useForm = (source: FormSource) => {
 };
 
 export type SettingsForm = ReturnType<typeof useForm>;
+
+/**
+ * Settings that are the same on all devices of the user. Changes are collected on the page and take effect when they
+ * are saved; changes made on another device meanwhile are shown, except where this page has changed the same thing.
+ */
+export const useDocForm = <T,>(doc: SyncedDoc<T>) => {
+  const saved = useDoc(doc);
+  const [edit, setEdit] = useState<{ base: T; value: T } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const combined = (current: { base: T; value: T } | null, latest: T) =>
+    current ? merge(current.base, current.value, latest) : latest;
+
+  const value = combined(edit, saved);
+  const dirty = !equal(value, saved);
+  useUnsavedChanges(dirty);
+
+  const state: SaveState = {
+    loaded: true,
+    loadError: '',
+    dirty,
+    saving,
+    error: null,
+    canSave: true,
+    save: async () => {
+      doc.set(combined(edit, doc.value));
+      setEdit(null);
+      setSaving(true);
+      // Errors are reported by the document, which also tries again later
+      await doc.flush();
+      setSaving(false);
+      if (!doc.dirty || doc.getSnapshot().status === 'local') {
+        toast(SAVED_MESSAGE);
+      }
+    },
+    revert: () => setEdit(null),
+  };
+
+  return {
+    ...state,
+    /** The values with the unsaved changes */
+    value,
+    update: (change: (current: T) => T) =>
+      setEdit((old) => {
+        const latest = doc.value;
+        const next = change(combined(old, latest));
+        return equal(next, latest) ? null : { base: latest, value: next };
+      }),
+  };
+};
 
 interface RemoteOptions {
   auto?: AutoGroup[];
@@ -190,7 +261,7 @@ export const Section = ({ title, children }: { title?: string; children: ReactNo
 export const Note = ({ children }: { children: ReactNode }) => <p className="settings-note">{children}</p>;
 
 /** Scrollable page with the save buttons of its form at the bottom */
-export const Page = ({ form, children }: { form?: SettingsForm; children: ReactNode }) => (
+export const Page = ({ form, children }: { form?: SaveState; children: ReactNode }) => (
   <>
     <div className="settings-scroll">
       {form?.loadError && (

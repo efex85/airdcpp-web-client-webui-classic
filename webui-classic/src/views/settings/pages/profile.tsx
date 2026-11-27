@@ -1,8 +1,10 @@
 import { useApp } from '../../../store/app';
 import { setIgnored, openPrivateChat, browseUser } from '../../../actions';
 import type { IgnoredUser } from '../../../api/settingsTypes';
+import { withSearch } from '../../../lib/settingsSearch';
 import { ExternalLink, links, LoadError, SimpleList, useApiData } from '../data';
 import { Fields, Note, Page, useRemoteForm } from '../form';
+import { settingsPage } from './common';
 
 const PROFILE_HELP: Record<number, string> = {
   0: 'The client is used in normal private/public hubs for transferring files via internet. Use this profile if unsure.',
@@ -12,7 +14,7 @@ const PROFILE_HELP: Record<number, string> = {
 
 const USER_KEYS = ['nick', 'description', 'email', 'setting_profile', 'language_file'];
 
-export const UserPage = () => {
+const User = () => {
   const form = useRemoteForm(USER_KEYS);
   return (
     <Page form={form}>
@@ -32,18 +34,13 @@ export const UserPage = () => {
   );
 };
 
+export const UserPage = withSearch(User, { keys: USER_KEYS });
+
 const AWAY_KEYS = ['away_message', 'away_no_bots', 'away_idle_time'];
 
-export const AwayPage = () => {
-  const form = useRemoteForm(AWAY_KEYS);
-  return (
-    <Page form={form}>
-      <Fields form={form} keys={AWAY_KEYS} />
-    </Page>
-  );
-};
+export const AwayPage = settingsPage(AWAY_KEYS);
 
-export const IgnoredUsersPage = () => {
+const IgnoredUsers = () => {
   const { data, error } = useApiData<IgnoredUser[]>('users/ignores', [
     'users/ignored_user_added',
     'users/ignored_user_removed',
@@ -80,16 +77,16 @@ export const IgnoredUsersPage = () => {
   );
 };
 
-export const MiscPage = () => {
-  // The system encoding is used for NMDC hubs on Windows; elsewhere it can be chosen
+export const IgnoredUsersPage = withSearch(IgnoredUsers, { words: 'stop ignoring' });
+
+const MISC_KEYS = ['auto_follow_redirects', 'disconnect_offline_users', 'disconnect_hubs_noreg', 'min_search_interval'];
+
+/** The system encoding is used for NMDC hubs on Windows; elsewhere it can be chosen */
+const miscKeys = (windows: boolean) => [...MISC_KEYS, ...(windows ? [] : ['nmdc_encoding'])];
+
+const Misc = () => {
   const windows = useApp((s) => s.login?.system_info.platform === 'windows');
-  const keys = [
-    'auto_follow_redirects',
-    'disconnect_offline_users',
-    'disconnect_hubs_noreg',
-    'min_search_interval',
-    ...(windows ? [] : ['nmdc_encoding']),
-  ];
+  const keys = miscKeys(windows);
   const form = useRemoteForm(keys);
   return (
     <Page form={form}>
@@ -105,3 +102,7 @@ export const MiscPage = () => {
     </Page>
   );
 };
+
+export const MiscPage = withSearch(Misc, {
+  keys: () => miscKeys(useApp.getState().login?.system_info.platform === 'windows'),
+});

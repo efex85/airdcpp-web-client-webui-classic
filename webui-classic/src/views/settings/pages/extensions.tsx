@@ -6,12 +6,14 @@ import { showForm } from '../../../components/forms/FormDialog';
 import { useAccess } from '../../../lib/access';
 import { formatDate } from '../../../lib/format';
 import { fetchThroughClient } from '../../../lib/proxy';
+import { withSearch } from '../../../lib/settingsSearch';
 import { compareVersions } from '../../../lib/version';
 import { reportError, toast, useApp } from '../../../store/app';
 import { socket } from '../../../store/session';
 import { confirm, openMenu } from '../../../store/ui';
 import { ExternalLink, LoadError, useApiData } from '../data';
-import { Fields, Note, Page, useRemoteForm } from '../form';
+import { Note, Page } from '../form';
+import { settingsPage } from './common';
 
 const NPM = 'https://registry.npmjs.org/';
 const CATALOG_URL = `${NPM}-/v1/search?text=keywords:airdcpp-extensions-public&size=100`;
@@ -300,7 +302,7 @@ const installFromUrl = () =>
     save: (values) => socket.post('extensions/download', { install_id: values.url, url: values.url }),
   });
 
-export const CatalogPage = () => {
+const Catalog = () => {
   const admin = useAccess()('admin');
   const installed = useApiData<Extension[]>('extensions', EVENTS);
   const installing = useInstallations();
@@ -356,14 +358,9 @@ export const CatalogPage = () => {
   );
 };
 
-const settingsPage = (keys: string[]) => () => {
-  const form = useRemoteForm(keys);
-  return (
-    <Page form={form}>
-      <Fields form={form} keys={keys} />
-    </Page>
-  );
-};
+export const CatalogPage = withSearch(Catalog, {
+  items: [{ title: 'Filter extensions', words: 'search' }, { title: 'Install from URL' }],
+});
 
 export const ExtensionOptionsPage = settingsPage([
   'extensions_debug_mode',

@@ -19,13 +19,19 @@ export const confirmDiscard = async (): Promise<boolean> =>
   !useSettingsNav.getState().dirty ||
   (await confirm('Unsaved changes', 'You have unsaved changes. Discard them?', 'Discard'));
 
-export const showSettingsPage = async (page: string) => {
-  if (page === useSettingsNav.getState().page || !(await confirmDiscard())) {
-    return;
+/** Returns false if the user wants to stay on the page with unsaved changes */
+export const showSettingsPage = async (page: string): Promise<boolean> => {
+  if (page === useSettingsNav.getState().page) {
+    return true;
+  }
+
+  if (!(await confirmDiscard())) {
+    return false;
   }
 
   useSettingsNav.setState({ page, dirty: false });
   save('settingsPage', page);
+  return true;
 };
 
 export const openSettings = (page?: string) => {

@@ -4,6 +4,7 @@ import { showForm } from '../../../components/forms/FormDialog';
 import { useAccess } from '../../../lib/access';
 import { formatDate } from '../../../lib/format';
 import { PERMISSIONS } from '../../../lib/permissions';
+import { withSearch } from '../../../lib/settingsSearch';
 import { reportError, toast, useApp } from '../../../store/app';
 import { socket } from '../../../store/session';
 import { confirm } from '../../../store/ui';
@@ -44,7 +45,7 @@ const editUser = (user?: WebUser) => {
   });
 };
 
-export const UsersPage = () => {
+const Users = () => {
   const ownName = useApp((s) => s.login?.user.username);
   const { data, error } = useApiData<WebUser[]>('web_users', [
     'web_users/web_user_added',
@@ -89,13 +90,22 @@ export const UsersPage = () => {
   );
 };
 
+export const UsersPage = withSearch(Users, {
+  items: [{ title: 'Add user', help: 'Web users, their passwords and permissions', words: 'account login' }],
+});
+
 const MESSAGE_LOGS = ['main', 'pm', 'syslog', 'status'];
 const TRANSFER_LOGS = ['downloads', 'uploads'];
 const logKeys = (section: string) => [`log_${section}`, `log_${section}_file`, `log_${section}_format`];
 
-export const LoggingPage = () => {
-  const sections = [...MESSAGE_LOGS, ...TRANSFER_LOGS];
-  const form = useRemoteForm(['log_directory', ...sections.flatMap(logKeys), 'log_list_transfers'], {
+const LOGGING_KEYS = [
+  'log_directory',
+  ...[...MESSAGE_LOGS, ...TRANSFER_LOGS].flatMap(logKeys),
+  'log_list_transfers',
+];
+
+const Logging = () => {
+  const form = useRemoteForm(LOGGING_KEYS, {
     disabled: (key, values) => {
       const match = key.match(/^(log_.+)_(file|format)$/);
       return !!match && !values[match[1]];
@@ -123,6 +133,20 @@ export const LoggingPage = () => {
     </Page>
   );
 };
+
+export const LoggingPage = withSearch(Logging, {
+  keys: LOGGING_KEYS,
+  words: 'logs',
+  // Every log has a "Filename" and a "Format"
+  describe: (key, name, nameOf) => {
+    if (key === 'log_directory') {
+      return { words: 'folder' };
+    }
+
+    const parent = key.match(/^(log_.+)_(file|format)$/)?.[1];
+    return parent ? { title: `${name} (${nameOf(parent)})` } : {};
+  },
+});
 
 const restartWebServer = async () => {
   const text =
@@ -153,7 +177,7 @@ const HTTPS_KEYS = [
   'web_tls_certificate_key_path',
 ];
 
-export const WebServerPage = () => {
+const WebServer = () => {
   const form = useRemoteForm([...HTTP_KEYS, ...HTTPS_KEYS]);
   return (
     <Page form={form}>
@@ -168,6 +192,12 @@ export const WebServerPage = () => {
     </Page>
   );
 };
+
+export const WebServerPage = withSearch(WebServer, {
+  keys: [...HTTP_KEYS, ...HTTPS_KEYS],
+  items: [{ title: 'Restart web server' }],
+  describe: (key, name) => ({ title: `${name} (${HTTP_KEYS.includes(key) ? 'HTTP' : 'HTTPS'})` }),
+});
 
 const SERVER_KEYS = ['web_server_threads', 'default_idle_timeout', 'ping_interval', 'ping_timeout'];
 const HOOK_KEYS = [
@@ -185,7 +215,7 @@ const HOOK_KEYS = [
   'list_menuitems_hook_timeout',
 ];
 
-export const ServerAdvancedPage = () => {
+const ServerAdvanced = () => {
   const form = useRemoteForm([...SERVER_KEYS, ...HOOK_KEYS]);
   return (
     <Page form={form}>
@@ -197,3 +227,9 @@ export const ServerAdvancedPage = () => {
     </Page>
   );
 };
+
+export const ServerAdvancedPage = withSearch(ServerAdvanced, {
+  keys: [...SERVER_KEYS, ...HOOK_KEYS],
+  items: [{ title: 'Hook timeouts' }, { title: 'Restart web server' }],
+  describe: (key) => (HOOK_KEYS.includes(key) ? { words: 'hook timeout' } : {}),
+});

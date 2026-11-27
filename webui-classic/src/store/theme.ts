@@ -29,10 +29,17 @@ const applyColors = (colors: ColorSettings) => {
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', variables['--chrome']!);
 };
 
+/** The variables of the text settings; null removes a variable */
+export const textVariables = (settings: LocalSettings): Record<string, string | null> => ({
+  '--font-scale': String(settings.ui_text_size / 100),
+  '--chat-scale': String(settings.chat_text_size / 100),
+  '--chat-font': FONTS[settings.chat_font] ?? null,
+});
+
 const applyText = (settings: LocalSettings) => {
-  setVariable('--font-scale', String(settings.ui_text_size / 100));
-  setVariable('--chat-scale', String(settings.chat_text_size / 100));
-  setVariable('--chat-font', FONTS[settings.chat_font] ?? null);
+  for (const [name, value] of Object.entries(textVariables(settings))) {
+    setVariable(name, value);
+  }
 };
 
 const LAST_COLORS = 'last-colors';

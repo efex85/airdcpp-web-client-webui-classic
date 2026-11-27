@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import type { ConnectivityStatus, ConnectivityProtocolStatus, SettingValues } from '../../../api/settingsTypes';
 import { useAccess } from '../../../lib/access';
+import { withSearch } from '../../../lib/settingsSearch';
 import { reportError, useApp } from '../../../store/app';
 import { socket } from '../../../store/session';
 import { ExternalLink, Facts, links, LoadError, useApiData } from '../data';
 import { Fields, Note, Page, Section, useRemoteForm } from '../form';
+import { settingsPage } from './common';
 
 const statusText = (status: ConnectivityProtocolStatus, running: boolean) =>
   running ? 'Detecting…' : `${status.text} (${status.auto_detect ? 'auto detected' : 'manual configuration'})`;
 
-export const DetectionPage = () => {
+const Detection = () => {
   const { data, error, reload } = useApiData<ConnectivityStatus>('connectivity/status');
   const generation = useApp((s) => s.generation);
   const canEdit = useAccess()('settings_edit');
@@ -91,19 +93,30 @@ export const DetectionPage = () => {
   );
 };
 
+export const DetectionPage = withSearch(Detection, {
+  items: [
+    { title: 'Current auto detection status', words: 'IPv4 IPv6 connectivity transfer port' },
+    { title: 'Detect now' },
+  ],
+});
+
 const MODE_DISABLED = -1;
+
+const PROTOCOL_KEYS = [
+  'connection_auto',
+  'connection_bind',
+  'connection_mode',
+  'connection_ip',
+  'connection_update_ip',
+  'connection_ip_override',
+];
+
+const protocolKeys = (version: 'v4' | 'v6') => PROTOCOL_KEYS.map((name) => `${name}_${version}`);
 
 /** The manual settings of one IP protocol */
 const ProtocolPage = ({ version }: { version: 'v4' | 'v6' }) => {
   const key = (name: string) => `${name}_${version}`;
-  const keys = [
-    'connection_auto',
-    'connection_bind',
-    'connection_mode',
-    'connection_ip',
-    'connection_update_ip',
-    'connection_ip_override',
-  ].map(key);
+  const keys = protocolKeys(version);
 
   const disabled = (name: string, values: SettingValues) => {
     const enabled = values[key('connection_mode')] !== MODE_DISABLED;
@@ -132,12 +145,12 @@ const ProtocolPage = ({ version }: { version: 'v4' | 'v6' }) => {
   );
 };
 
-export const Ipv4Page = () => <ProtocolPage version="v4" />;
-export const Ipv6Page = () => <ProtocolPage version="v6" />;
+export const Ipv4Page = withSearch(() => <ProtocolPage version="v4" />, { keys: protocolKeys('v4') });
+export const Ipv6Page = withSearch(() => <ProtocolPage version="v6" />, { keys: protocolKeys('v6') });
 
 const PORT_KEYS = ['tcp_port', 'udp_port', 'tls_port', 'preferred_port_mapper'];
 
-export const PortsPage = () => {
+const Ports = () => {
   const form = useRemoteForm(PORT_KEYS, { manual: true });
   return (
     <Page form={form}>
@@ -155,6 +168,12 @@ export const PortsPage = () => {
   );
 };
 
+export const PortsPage = withSearch(Ports, {
+  keys: PORT_KEYS,
+  // The names of the settings are "TCP", "UDP" and "TLS/TCP"
+  describe: (key) => (key.endsWith('_port') ? { words: 'port' } : {}),
+});
+
 const SOCKS5 = 1;
 const PROXY_KEYS = [
   'outgoing_mode',
@@ -166,7 +185,7 @@ const PROXY_KEYS = [
   'http_proxy',
 ];
 
-export const ProxiesPage = () => {
+const Proxies = () => {
   const form = useRemoteForm(PROXY_KEYS, {
     disabled: (name, values) => name.startsWith('socks_') && values.outgoing_mode !== SOCKS5,
   });
@@ -177,13 +196,12 @@ export const ProxiesPage = () => {
   );
 };
 
+export const ProxiesPage = withSearch(Proxies, {
+  keys: PROXY_KEYS,
+  words: 'proxy',
+  describe: (key, name) => (['socks_port', 'socks_user', 'socks_password'].includes(key) ? { title: `${name} (SOCKS)` } : {}),
+});
+
 const ENCRYPTION_KEYS = ['always_ccpm', 'tls_mode', 'tls_allow_untrusted_clients', 'tls_allow_untrusted_hubs'];
 
-export const EncryptionPage = () => {
-  const form = useRemoteForm(ENCRYPTION_KEYS);
-  return (
-    <Page form={form}>
-      <Fields form={form} keys={ENCRYPTION_KEYS} />
-    </Page>
-  );
-};
+export const EncryptionPage = settingsPage(ENCRYPTION_KEYS);

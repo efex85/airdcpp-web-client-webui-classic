@@ -3,11 +3,13 @@ import type { FavoriteDirectory, SearchType, SettingDefinition } from '../../../
 import { showForm } from '../../../components/forms/FormDialog';
 import { useAccess } from '../../../lib/access';
 import { fsName } from '../../../lib/fsPath';
+import { withSearch } from '../../../lib/settingsSearch';
 import { reportError, useApp } from '../../../store/app';
 import { socket } from '../../../store/session';
 import { confirm } from '../../../store/ui';
 import { ExternalLink, links, LoadError, SimpleList, useApiData } from '../data';
 import { Fields, Note, Page, Section, useRemoteForm } from '../form';
+import { groupedPage } from './common';
 
 const editDirectory = async (all: FavoriteDirectory[], item?: FavoriteDirectory) => {
   const separator = useApp.getState().login?.system_info.path_separator ?? '/';
@@ -71,8 +73,10 @@ const FavoriteDirectories = () => {
   );
 };
 
-export const LocationsPage = () => {
-  const keys = ['download_directory'];
+const LOCATION_KEYS = ['download_directory'];
+
+const Locations = () => {
+  const keys = LOCATION_KEYS;
   const form = useRemoteForm(keys);
   return (
     <Page form={form}>
@@ -85,21 +89,11 @@ export const LocationsPage = () => {
   );
 };
 
-type Group = [title: string | undefined, keys: string[]];
-
-/** Pages that only contain settings */
-const groupedPage = (groups: Group[]) => () => {
-  const form = useRemoteForm(groups.flatMap(([, keys]) => keys));
-  return (
-    <Page form={form}>
-      {groups.map(([title, keys]) => (
-        <Section key={title ?? keys[0]} title={title}>
-          <Fields form={form} keys={keys} />
-        </Section>
-      ))}
-    </Page>
-  );
-};
+export const LocationsPage = withSearch(Locations, {
+  keys: LOCATION_KEYS,
+  words: 'folder directory path',
+  items: [{ title: 'Favorite download directories' }, { title: 'Add directory', words: 'favorite' }],
+});
 
 export const SkippingPage = groupedPage([
   [undefined, ['dont_download_shared', 'dont_download_queued', 'download_dupe_min_size']],
@@ -149,7 +143,7 @@ const editSearchType = (item?: SearchType) =>
     save: (values) => (item ? socket.patch(`search/types/${item.id}`, values) : socket.post('search/types', values)),
   });
 
-export const SearchTypesPage = () => {
+const SearchTypes = () => {
   const { data, error } = useApiData<SearchType[]>('search/types', ['search/search_types_updated']);
   const canEdit = useAccess()('settings_edit');
 
@@ -193,3 +187,7 @@ export const SearchTypesPage = () => {
     </Page>
   );
 };
+
+export const SearchTypesPage = withSearch(SearchTypes, {
+  items: [{ title: 'Add search type', help: 'Search types and their file extensions' }],
+});

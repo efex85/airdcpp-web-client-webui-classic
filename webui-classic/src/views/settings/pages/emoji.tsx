@@ -1,10 +1,11 @@
-// Emoji in chats. Changes apply immediately.
+// Emoji in chats
 import { RefreshCw } from 'lucide-react';
 import { useEffect } from 'react';
 import { MessageText } from '../../../components/MessageText';
-import { emojiDoc, useDoc } from '../../../store/docs';
-import { loadPack, loadPackNames, useEmoji, useEmojiStore } from '../../../store/emoji';
-import { Note, Page, Section } from '../form';
+import { withSearch } from '../../../lib/settingsSearch';
+import { emojiDoc } from '../../../store/docs';
+import { loadPack, loadPackNames, useEmojiStore, useEmojiWith } from '../../../store/emoji';
+import { Note, Page, Section, useDocForm } from '../form';
 import { SyncNote } from './personal';
 
 const reload = (pack: string) => {
@@ -38,11 +39,12 @@ const PackStatus = ({ pack }: { pack: string }) => {
   );
 };
 
-export const EmojiPage = () => {
-  const settings = useDoc(emojiDoc);
+const Emoji = () => {
+  const form = useDocForm(emojiDoc);
+  const settings = form.value;
   const names = useEmojiStore((s) => s.names);
   const namesError = useEmojiStore((s) => s.namesError);
-  const { active } = useEmoji();
+  const { active } = useEmojiWith(settings);
 
   useEffect(() => {
     void loadPackNames();
@@ -50,13 +52,13 @@ export const EmojiPage = () => {
 
   const missing = !!settings.pack && !!names && !names.includes(settings.pack);
   return (
-    <Page>
+    <Page form={form}>
       <SyncNote doc={emojiDoc} />
-      <label className="check-field">
+      <label className="check-field" data-key="emoji_enabled">
         <input
           type="checkbox"
           checked={settings.enabled}
-          onChange={(e) => emojiDoc.set({ ...emojiDoc.value, enabled: e.target.checked })}
+          onChange={(e) => form.update((value) => ({ ...value, enabled: e.target.checked }))}
         />
         Show emoji in chats
       </label>
@@ -64,13 +66,13 @@ export const EmojiPage = () => {
         Text codes such as :) are shown as emoji, and a button for inserting them appears next to the message box. Only
         the display changes: messages are sent as they are written.
       </p>
-      <div className="field preset-field">
+      <div className="field preset-field" data-key="emoji_pack">
         <label htmlFor="emoji-pack">Emoji set</label>
         <select
           id="emoji-pack"
           disabled={!settings.enabled}
           value={settings.pack}
-          onChange={(e) => emojiDoc.set({ ...emojiDoc.value, pack: e.target.value })}
+          onChange={(e) => form.update((value) => ({ ...value, pack: e.target.value }))}
         >
           <option value="">Emoji of your device</option>
           {names?.map((name) => (
@@ -91,11 +93,6 @@ export const EmojiPage = () => {
         </p>
       )}
       {settings.enabled && settings.pack && <PackStatus pack={settings.pack} />}
-      <Note>
-        Emoticon packs are made like those of the Windows client: copy a file such as Name.xml, together with the folder
-        of its pictures, into the folder EmoPacks in the configuration directory of the client (./config/EmoPacks with
-        the example docker-compose.yml). Then press Reload.
-      </Note>
       <Section title="Preview">
         <div className="chat-log preview-chat">
           <div className="line">
@@ -103,6 +100,19 @@ export const EmojiPage = () => {
           </div>
         </div>
       </Section>
+      <Note>
+        Emoticon packs are made like those of the Windows client: copy a file such as Name.xml, together with the folder
+        of its pictures, into the folder EmoPacks in the configuration directory of the client (./config/EmoPacks with
+        the example docker-compose.yml). Then press Reload.
+      </Note>
     </Page>
   );
 };
+
+export const EmojiPage = withSearch(Emoji, {
+  words: 'smileys emoticons',
+  items: [
+    { title: 'Show emoji in chats', help: 'Text codes such as :) are shown as emoji', selector: '[data-key="emoji_enabled"]' },
+    { title: 'Emoji set', words: 'emoticon pack EmoPacks', selector: '[data-key="emoji_pack"]' },
+  ],
+});

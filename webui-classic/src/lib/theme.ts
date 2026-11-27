@@ -284,3 +284,19 @@ export const resolveTheme = (settings: ColorSettings): ResolvedTheme => {
 
   return { variables, classes };
 };
+
+/**
+ * The classes and variables for showing a part of the page with other colors than the rest of it: what isn't set is
+ * reset, so that nothing is inherited from the colors of the page
+ */
+export const scopedTheme = (settings: ColorSettings): { classes: string[]; variables: Record<string, string> } => {
+  const { variables, classes } = resolveTheme(settings);
+  const scoped = Object.fromEntries(Object.entries(variables).map(([name, value]) => [name, value ?? 'initial']));
+  for (const def of COLOR_DEFINITIONS) {
+    if (def.optional && def.bold !== undefined && !colorOf(settings, def.key) && def.key !== 'nick') {
+      scoped[`${def.cssVar}-weight`] = 'initial';
+    }
+  }
+
+  return { classes: Object.keys(classes).filter((name) => classes[name]), variables: scoped };
+};

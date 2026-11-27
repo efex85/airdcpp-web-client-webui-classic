@@ -31,12 +31,20 @@ types), sharing (shared folders, share profiles, hashing, excluded paths), notif
 extensions, web users, logging, web server, and statistics. Which pages are shown, and whether they can be
 changed, depends on the permissions of the web user.
 
-- Changes on a settings page take effect with **Save changes**. Lists (folders, profiles, users and so on)
-  are changed right away through their dialogs.
+- Changes on a settings page take effect with **Save changes**; **Undo** drops them. Leaving a page or closing the
+  window with unsaved changes asks first. This is the same on every page with settings, also on those under
+  **View**. Lists (folders, profiles, users and so on) are changed right away through their dialogs, and buttons
+  such as "Detect now" or "Pause" act at once.
+- **Home and startup**, **Colors**, **Tab highlights** and **Emoji** are synced between your devices. If one of
+  these pages is changed on another device while you edit it, the change appears on your page; where both changed
+  the same thing, yours stays and is what **Save changes** stores.
+- **Search settings**, the box at the top, finds pages and settings by name. Every word has to match, in the name
+  of the setting, its explanation or the name of its page. Click a result to open the page; the setting is scrolled
+  into view and marked for a moment. Enter opens the first result and Esc clears the box. Only pages that you are
+  allowed to see are searched. Settings of extensions (**Configure**) and the entries of lists aren't searched.
 - Settings that are detected automatically show the detected value and can't be edited until the detection is
   turned off. The detected values are not saved over the manual ones.
-- The pages **Home and startup**, **Colors** and **Text and chat** under **View** apply changes immediately.
-  What is synced and what belongs to one browser is listed under [Synced and per browser](#synced-and-per-browser).
+- What is synced and what belongs to one browser is listed under [Synced and per browser](#synced-and-per-browser).
 - Popups appear inside the page. While the page is in the background the browser's own notifications are
   used instead, if you have allowed them; browsers only permit that over HTTPS or on localhost.
 - Some settings of the daemon are only available through its API and are not included.
@@ -127,6 +135,10 @@ While they are open they use the whole window. Search, or tap Search options aga
 - **Tab highlights**: how the tabs of chats are marked, see below.
 - **Text and chat**: text size of the interface and of chats, chat font and timestamp format. List columns
   become wider or narrower with the text size.
+
+These pages, **Tab highlights** and **Emoji** show your unsaved choices in a preview only. The rest of the page
+changes when you press **Save changes**. On the Colors page the preview stays in view while you scroll (not in a
+low window on a computer); a preview that doesn't fit on a small screen can be scrolled by itself.
 
 ## Tab highlights
 

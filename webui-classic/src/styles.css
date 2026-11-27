@@ -1007,13 +1007,13 @@ textarea[aria-invalid='true'] {
 
 /* Only when a color has been chosen for them */
 .custom-nick-favorite .nick.favorite {
-  color: var(--nick-favorite);
-  font-weight: var(--nick-favorite-weight, 400);
+  color: var(--nick-favorite, var(--nick, inherit));
+  font-weight: var(--nick-favorite-weight, var(--nick-weight, normal));
 }
 
 .custom-nick-ignored .nick.ignored {
-  color: var(--nick-ignored);
-  font-weight: var(--nick-ignored-weight, 400);
+  color: var(--nick-ignored, var(--nick, inherit));
+  font-weight: var(--nick-ignored-weight, var(--nick-weight, normal));
 }
 
 .nick.self {
@@ -1739,12 +1739,88 @@ fieldset.field {
   flex-direction: row;
 }
 
-.settings-tree {
+/* The search box above the list of pages or the results */
+.settings-side {
+  display: flex;
   flex: 0 0 220px;
-  padding: 4px 0 12px;
-  overflow: auto;
+  flex-direction: column;
+  min-height: 0;
   background: var(--bg-input);
   border-right: 1px solid var(--border-strong);
+}
+
+.settings-search {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-search input {
+  flex: 1;
+}
+
+.settings-side .settings-search {
+  padding: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-tree {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 0 12px;
+  overflow: auto;
+}
+
+.settings-results {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 4px 0 12px;
+  overflow: auto;
+}
+
+.settings-results > * {
+  flex: none;
+}
+
+.settings-results > div {
+  padding: 4px 10px;
+  overflow-wrap: anywhere;
+}
+
+.settings-results button {
+  display: block;
+  padding: 2px 8px 2px 22px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  background: transparent;
+  border-color: transparent;
+}
+
+.settings-results button.result-page {
+  margin-top: 6px;
+  padding-left: 10px;
+  font-weight: 600;
+}
+
+.settings-results button.result-page .muted {
+  font-weight: normal;
+}
+
+.settings-results button.result-page[aria-current='page'] {
+  background: var(--select);
+}
+
+.settings-results button.result-page[aria-current='page'] .muted {
+  color: inherit;
+}
+
+/* The chosen search result on its page */
+.search-hit {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .settings-tree h2 {
@@ -1883,7 +1959,10 @@ fieldset.field {
 }
 
 .settings-picker {
+  display: flex;
   flex: none;
+  flex-direction: column;
+  gap: 5px;
   padding: 5px 6px;
   background: var(--chrome);
   border-bottom: 1px solid var(--border-strong);
@@ -2402,12 +2481,143 @@ textarea.notes {
   gap: 8px;
 }
 
+/* A part of the page with other colors (components/ThemeScope.tsx) */
+.theme-scope {
+  color: var(--text);
+}
+
+/* The preview stays in view while the colors below or beside it are changed */
+.colors-box {
+  container-type: inline-size;
+}
+
+.colors-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.colors-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.colors-layout > .color-preview {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  flex: none;
+  max-height: 46vh;
+  overflow: auto;
+  background: var(--bg);
+  box-shadow: 0 6px 10px rgb(0 0 0 / 45%);
+}
+
+@container (min-width: 820px) {
+  .colors-layout {
+    flex-direction: row-reverse;
+    align-items: flex-start;
+    justify-content: flex-end;
+  }
+
+  .colors-layout > .color-preview {
+    width: 400px;
+    max-height: 72vh;
+  }
+
+  .colors-groups {
+    flex: 1;
+    max-width: 620px;
+  }
+}
+
 .color-preview {
   max-width: 620px;
   border: 1px solid var(--border-strong);
 }
 
+.preview-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 5px 6px;
+  background: var(--chrome);
+  border-top: 1px solid var(--border);
+}
+
+.preview-controls > input:not([type='checkbox']) {
+  width: 110px;
+}
+
+.preview-button {
+  padding: 1px 10px;
+  background: var(--chrome-hover);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+}
+
+/* Preview of the text settings */
+.text-preview {
+  max-width: 620px;
+  font-size: calc(12px * var(--font-scale));
+  border: 1px solid var(--border-strong);
+}
+
+.text-preview .tabbar {
+  border-top: 0;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.text-preview .tab {
+  padding: 2px 8px;
+  border-top: 1px solid var(--border);
+}
+
+.text-preview-ui {
+  padding: 4px 6px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+
+.text-preview .preview-chat {
+  border: 0;
+}
+
+/* The menu button of phones, with its dots */
+.dot-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.dot-sample {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot-button {
+  position: relative;
+  display: flex;
+  padding: 8px;
+  background: var(--chrome);
+  border: 1px solid var(--border);
+}
+
+.dot-mark {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
 .color-preview .tabbar {
+  flex-wrap: wrap;
   border-top: 0;
   border-bottom: 1px solid var(--border-strong);
 }
@@ -2838,6 +3048,37 @@ textarea.notes {
     flex-direction: column;
   }
 
+  .text-preview {
+    font-size: calc(14px * var(--font-scale));
+  }
+
+  .settings-results button {
+    min-height: 38px;
+  }
+
+  /* More room for the colors below the preview */
+  .settings-page .color-preview .chat-log {
+    line-height: 1.3;
+  }
+
+  .colors-layout > .color-preview {
+    max-height: 36vh;
+  }
+
+  .preview-nicks {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 12px;
+  }
+
+  .preview-nicks :is(.time, .preview-text) {
+    display: none;
+  }
+
+  .settings-page.hidden {
+    display: none;
+  }
+
   .settings-scroll {
     padding: 10px 10px 20px;
   }
@@ -2877,5 +3118,40 @@ textarea.notes {
 @media (hover: none) {
   .menu-item:hover:not(:disabled):not(.open) {
     background: transparent;
+  }
+}
+
+/* Too little height for a preview that stays in view (e.g. a phone held sideways) */
+@media (max-height: 520px) {
+  .colors-layout > .color-preview {
+    position: static;
+    max-height: none;
+  }
+}
+
+/* A phone held sideways has room for the preview beside the colors, and for the search beside the page list */
+@media (max-height: 520px) and (min-width: 640px) and (pointer: coarse) {
+  .colors-layout {
+    flex-direction: row-reverse;
+    align-items: flex-start;
+  }
+
+  .colors-layout > .color-preview {
+    position: sticky;
+    width: 46%;
+    max-height: calc(100vh - 165px);
+  }
+
+  .colors-groups {
+    flex: 1;
+  }
+
+  .settings-picker {
+    flex-direction: row;
+  }
+
+  .settings-picker > * {
+    flex: 1;
+    min-width: 0;
   }
 }

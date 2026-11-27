@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { formatDate, formatDuration, formatSize } from '../../../lib/format';
+import { withSearch } from '../../../lib/settingsSearch';
 import { average, formatBitRate, percentage } from '../../../lib/statistics';
 import { useApp } from '../../../store/app';
 import { socket } from '../../../store/session';
@@ -56,7 +57,7 @@ const StatsPage = <T,>({
   );
 };
 
-export const ApplicationPage = () => {
+const Application = () => {
   const info = useApp((s) => s.login?.system_info);
   const { data } = useStats<{ active_sessions: number; server_threads: number }>('system/stats', 5);
   return (
@@ -92,6 +93,16 @@ export const ApplicationPage = () => {
   );
 };
 
+export const ApplicationPage = withSearch(Application, {
+  words: 'about version',
+  items: [
+    { title: 'Application version' },
+    { title: 'API version' },
+    { title: 'Active sessions' },
+    { title: 'Documentation', words: 'help home page bug tracker' },
+  ],
+});
+
 interface TransferredBytes {
   session_downloaded: number;
   session_uploaded: number;
@@ -101,7 +112,7 @@ interface TransferredBytes {
 
 const bytes = (value: number) => formatSize(value) || '0 B';
 
-export const TransferStatsPage = () => (
+const TransferStats = () => (
   <StatsPage<TransferredBytes> path="transfers/transferred_bytes" seconds={5} empty="No statistics">
     {(s) => (
       <>
@@ -124,9 +135,13 @@ export const TransferStatsPage = () => (
   </StatsPage>
 );
 
+export const TransferStatsPage = withSearch(TransferStats, {
+  items: [{ title: 'Total downloaded' }, { title: 'Total uploaded' }],
+});
+
 type Numbers = Record<string, number>;
 
-export const ShareStatsPage = () => (
+const ShareStats = () => (
   <StatsPage<Numbers> path="share/stats" seconds={60} empty="No files shared">
     {(s) => (
       <>
@@ -168,6 +183,10 @@ export const ShareStatsPage = () => (
   </StatsPage>
 );
 
+export const ShareStatsPage = withSearch(ShareStats, {
+  items: [{ title: 'Total share size' }, { title: 'Total files' }, { title: 'Incoming searches' }],
+});
+
 interface HubStats {
   total_users: number;
   unique_users: number;
@@ -178,7 +197,7 @@ interface HubStats {
   clients: { name: string; count: number }[];
 }
 
-export const HubStatsPage = () => (
+const HubStats = () => (
   <StatsPage<HubStats> path="hubs/stats" seconds={10} empty="No hubs online">
     {(s) => (
       <>
@@ -202,3 +221,7 @@ export const HubStatsPage = () => (
     )}
   </StatsPage>
 );
+
+export const HubStatsPage = withSearch(HubStats, {
+  items: [{ title: 'Total users' }, { title: 'Total share' }, { title: 'Clients' }],
+});

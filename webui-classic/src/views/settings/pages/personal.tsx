@@ -1,9 +1,12 @@
-// Home and startup, colors, and text of chats. These pages apply changes immediately.
+// Home and startup, colors, and text of chats
 import { RotateCcw } from 'lucide-react';
-import { Fragment, type ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { SettingDefinition } from '../../../api/settingsTypes';
 import { SettingFields } from '../../../components/forms/SettingFields';
-import { Time } from '../../../components/Time';
+import { ThemeScope } from '../../../components/ThemeScope';
+import { formatChatTime } from '../../../lib/format';
+import { withSearch } from '../../../lib/settingsSearch';
+import type { SyncedDoc } from '../../../lib/syncedDoc';
 import {
   COLOR_DEFINITIONS,
   colorOf,
@@ -13,19 +16,21 @@ import {
   type ColorDefinition,
   type ColorSettings,
 } from '../../../lib/theme';
-import { colorsDoc, startupDoc, useDoc, useDocStatus } from '../../../store/docs';
-import { saveLocalSettings, TEXT_DEFINITIONS, useLocalSettings } from '../../../store/localSettings';
+import { colorsDoc, startupDoc, useDocStatus } from '../../../store/docs';
+import { mergeLocalSettings, TEXT_DEFINITIONS, useLocalSettings } from '../../../store/localSettings';
+import { textVariables } from '../../../store/theme';
 import { confirm } from '../../../store/ui';
-import type { SyncedDoc } from '../../../lib/syncedDoc';
-import { Note, Page, Section } from '../form';
+import { Fields, Note, Page, Section, useDocForm } from '../form';
+import { useLocalForm } from './view';
 
+/** Where the settings of a synced document are stored */
 export const SyncNote = <T,>({ doc }: { doc: SyncedDoc<T> }) => {
   const status = useDocStatus(doc);
   return (
     <Note>
       {status === 'local'
-        ? 'Changes apply immediately. This client can’t sync them, so they are stored in this browser only.'
-        : `Changes apply immediately and are the same on all your devices.${status === 'pending' ? ' Saving…' : ''}`}
+        ? 'This client can’t sync these settings, so they are stored in this browser only.'
+        : `These settings are the same on all your devices.${status === 'pending' ? ' Saving to the client…' : ''}`}
     </Note>
   );
 };
@@ -47,38 +52,59 @@ const STARTUP_DEFINITIONS: SettingDefinition[] = [
   },
 ];
 
-export const StartupPage = () => {
-  const value = useDoc(startupDoc);
+const entriesOf = (definitions: SettingDefinition[]) =>
+  definitions.map((def) => ({
+    title: def.title,
+    help: def.help,
+    words: def.options?.map((o) => o.name).join(' '),
+    selector: `[data-key="${def.key}"]`,
+  }));
+
+const Startup = () => {
+  const form = useDocForm(startupDoc);
   return (
-    <Page>
+    <Page form={form}>
       <SyncNote doc={startupDoc} />
       <SettingFields
         definitions={STARTUP_DEFINITIONS}
-        values={{ ...value }}
-        onChange={(key, v) => startupDoc.set({ ...startupDoc.value, [key]: !!v })}
+        values={{ ...form.value }}
+        onChange={(key, v) => form.update((value) => ({ ...value, [key]: !!v }))}
       />
     </Page>
   );
 };
 
-export const TextPage = () => {
-  const values = useLocalSettings();
+export const StartupPage = withSearch(Startup, { items: entriesOf(STARTUP_DEFINITIONS) });
+
+const Text = () => {
+  const form = useLocalForm(TEXT_DEFINITIONS);
+  const saved = useLocalSettings();
+  const shown = mergeLocalSettings(saved, form.values);
+  const style = Object.fromEntries(
+    Object.entries(textVariables(shown)).map(([name, value]) => [name, value ?? 'initial']),
+  ) as CSSProperties;
+  const time = formatChatTime(Math.floor(Date.now() / 1000), shown.chat_timestamps);
+
   return (
-    <Page>
-      <Note>
-        Changes apply immediately. These settings are stored in this browser, so that a phone and a computer can have
-        different sizes.
-      </Note>
-      <SettingFields
-        definitions={TEXT_DEFINITIONS}
-        values={{ ...values }}
-        onChange={(key, value) => saveLocalSettings({ [key]: value })}
-      />
+    <Page form={form}>
+      <Note>These settings are stored in this browser, so that a phone and a computer can have different sizes.</Note>
+      <Fields form={form} keys={TEXT_DEFINITIONS.map((d) => d.key)} />
       <Section title="Preview">
-        <div className="chat-log preview-chat">
-          <div className="line">
-            <Time value={Math.floor(Date.now() / 1000)} />
-            &lt;<span className="nick">Nickname</span>&gt; This is how a chat message looks.
+        <div className="text-preview" aria-label="Preview" style={style}>
+          <div className="tabbar">
+            <div className="tab active">Shown tab</div>
+            <div className="tab">Tab</div>
+          </div>
+          <div className="text-preview-ui">This is how the text of the interface looks.</div>
+          <div className="chat-log preview-chat">
+            <div className="line">
+              {time && (
+                <>
+                  <span className="time">[{time}]</span>{' '}
+                </>
+              )}
+              &lt;<span className="nick">Nickname</span>&gt; This is how a chat message looks.
+            </div>
           </div>
         </div>
       </Section>
@@ -86,7 +112,10 @@ export const TextPage = () => {
   );
 };
 
-export const change = (update: (colors: ColorSettings) => ColorSettings) => colorsDoc.set(update(colorsDoc.value));
+export const TextPage = withSearch(Text, { items: entriesOf(TEXT_DEFINITIONS), words: 'font size' });
+
+/** Changes the colors that are being edited on a page */
+export type ColorUpdate = (change: (colors: ColorSettings) => ColorSettings) => void;
 
 export const without = <T,>(record: Record<string, T>, key: string) => {
   const next = { ...record };
@@ -94,18 +123,26 @@ export const without = <T,>(record: Record<string, T>, key: string) => {
   return next;
 };
 
-const choosePreset = async (preset: string) => {
-  const { colors, bold, highlight } = colorsDoc.value;
-  const own = Object.keys(colors).length + Object.keys(bold).length;
-  if (own && !(await confirm('Change the color set', 'Your own color choices are replaced. Continue?', 'Replace'))) {
+const choosePreset = async (preset: string, settings: ColorSettings, update: ColorUpdate) => {
+  const own = Object.keys(settings.colors).length + Object.keys(settings.bold).length;
+  const text = 'Your own color choices are replaced. Nothing is saved before you press “Save changes”.';
+  if (own && !(await confirm('Change the color set', text, 'Replace'))) {
     return;
   }
 
   // Which events mark a tab isn't a matter of colors
-  colorsDoc.set({ ...DEFAULT_COLORS, preset, highlight });
+  update((c) => ({ ...DEFAULT_COLORS, preset, highlight: c.highlight }));
 };
 
-export const ColorRow = ({ def, settings }: { def: ColorDefinition; settings: ColorSettings }) => {
+export const ColorRow = ({
+  def,
+  settings,
+  update,
+}: {
+  def: ColorDefinition;
+  settings: ColorSettings;
+  update: ColorUpdate;
+}) => {
   const value = colorOf(settings, def.key);
   const changed = def.key in settings.colors || def.key in settings.bold;
   return (
@@ -116,7 +153,7 @@ export const ColorRow = ({ def, settings }: { def: ColorDefinition; settings: Co
         // Without an own color the field shows a neutral gray
         value={value ?? '#808080'}
         className={value ? undefined : 'unset'}
-        onChange={(e) => change((c) => ({ ...c, colors: { ...c.colors, [def.key]: e.target.value } }))}
+        onChange={(e) => update((c) => ({ ...c, colors: { ...c.colors, [def.key]: e.target.value } }))}
       />
       <span className="color-label">
         {def.label}
@@ -129,7 +166,7 @@ export const ColorRow = ({ def, settings }: { def: ColorDefinition; settings: Co
             type="checkbox"
             aria-label={`Bold: ${def.label}`}
             checked={isBold(settings, def.key)}
-            onChange={(e) => change((c) => ({ ...c, bold: { ...c.bold, [def.key]: e.target.checked } }))}
+            onChange={(e) => update((c) => ({ ...c, bold: { ...c.bold, [def.key]: e.target.checked } }))}
           />
           Bold
         </label>
@@ -140,7 +177,7 @@ export const ColorRow = ({ def, settings }: { def: ColorDefinition; settings: Co
         title="Back to the color of the set"
         aria-label={`Reset ${def.label}`}
         disabled={!changed}
-        onClick={() => change((c) => ({ ...c, colors: without(c.colors, def.key), bold: without(c.bold, def.key) }))}
+        onClick={() => update((c) => ({ ...c, colors: without(c.colors, def.key), bold: without(c.bold, def.key) }))}
       >
         <RotateCcw size={13} />
       </button>
@@ -154,14 +191,15 @@ const Line = ({ children, className = '' }: { children: ReactNode; className?: s
   </div>
 );
 
-const Said = ({ nick, type, text = 'Hello' }: { nick: string; type: string; text?: string }) => (
+const Said = ({ nick, type }: { nick: string; type: string }) => (
   <Line>
-    &lt;<span className={`nick ${type}`}>{nick}</span>&gt; {text}
+    &lt;<span className={`nick ${type}`}>{nick}</span>&gt;<span className="preview-text"> Hello</span>
   </Line>
 );
 
-const Preview = () => (
-  <div className="color-preview" aria-label="Preview">
+/** Shows every color of the page, so that it can be judged before it's saved */
+const Preview = ({ colors }: { colors: ColorSettings }) => (
+  <ThemeScope colors={colors} className="color-preview" label="Preview">
     <div className="tabbar">
       <div className="tab active">Shown tab</div>
       <div className="tab">Tab</div>
@@ -169,12 +207,15 @@ const Preview = () => (
       <div className="tab mention">Mention</div>
     </div>
     <div className="chat-log">
-      <Said nick="Someone" type="" />
-      <Said nick="Me" type="self" />
-      <Said nick="Operator" type="op" />
-      <Said nick="Bot" type="bot" />
-      <Said nick="Favorite" type="favorite" />
-      <Said nick="Ignored" type="ignored" />
+      {/* On phones these are shown beside each other, without time and text */}
+      <div className="preview-nicks">
+        <Said nick="Someone" type="" />
+        <Said nick="Me" type="self" />
+        <Said nick="Operator" type="op" />
+        <Said nick="Bot" type="bot" />
+        <Said nick="Favorite" type="favorite" />
+        <Said nick="Ignored" type="ignored" />
+      </div>
       <Line className="mentioned">
         &lt;<span className="nick">Someone</span>&gt; Hi <span className="mention">Me</span>, see{' '}
         <span className="link">https://example.org</span>
@@ -193,44 +234,78 @@ const Preview = () => (
       </div>
       <div className="preview-selected">Selected item</div>
     </div>
-  </div>
+    <div className="preview-controls">
+      <input readOnly tabIndex={-1} aria-label="Example input field" value="Input field" />
+      <label className="check-field">
+        <input type="checkbox" readOnly tabIndex={-1} checked />
+        Accent
+      </label>
+      <span className="preview-button">Button</span>
+      <span className="muted">Dimmed text</span>
+    </div>
+  </ThemeScope>
 );
 
-export const ColorsPage = () => {
-  const settings = useDoc(colorsDoc);
-  // The colors of the tabs have a page of their own
-  const groups = [...new Set(COLOR_DEFINITIONS.map((d) => d.group))].filter((group) => group !== 'Tabs');
+// The colors of the tabs have a page of their own
+const PAGE_COLORS = COLOR_DEFINITIONS.filter((d) => d.group !== 'Tabs');
+
+const Colors = () => {
+  const form = useDocForm(colorsDoc);
+  const settings = form.value;
+  const groups = [...new Set(PAGE_COLORS.map((d) => d.group))];
   const own = Object.keys(settings.colors).length + Object.keys(settings.bold).length > 0;
 
   return (
-    <Page>
+    <Page form={form}>
       <SyncNote doc={colorsDoc} />
       <div className="field preset-field">
         <label htmlFor="color-preset">Color set</label>
-        <select id="color-preset" value={settings.preset} onChange={(e) => void choosePreset(e.target.value)}>
+        <select
+          id="color-preset"
+          value={settings.preset}
+          onChange={(e) => void choosePreset(e.target.value, settings, form.update)}
+        >
           {Object.entries(PRESETS).map(([id, preset]) => (
             <option key={id} value={id}>
               {preset.name}
             </option>
           ))}
         </select>
-        <button type="button" disabled={!own} onClick={() => void choosePreset(settings.preset)}>
+        <button type="button" disabled={!own} onClick={() => void choosePreset(settings.preset, settings, form.update)}>
           Remove my own colors
         </button>
       </div>
       <Note>The colors of marked tabs are chosen on the page “Tab highlights”.</Note>
-      <Preview />
-      {groups.map((group) => (
-        <Fragment key={group}>
-          <Section title={group}>
-            <div className="color-list">
-              {COLOR_DEFINITIONS.filter((d) => d.group === group).map((def) => (
-                <ColorRow key={def.key} def={def} settings={settings} />
-              ))}
-            </div>
-          </Section>
-        </Fragment>
-      ))}
+      <div className="colors-box">
+        <div className="colors-layout">
+          <Preview colors={settings} />
+          <div className="colors-groups">
+            {groups.map((group) => (
+              <Section key={group} title={group}>
+                <div className="color-list">
+                  {PAGE_COLORS.filter((d) => d.group === group).map((def) => (
+                    <ColorRow key={def.key} def={def} settings={settings} update={form.update} />
+                  ))}
+                </div>
+              </Section>
+            ))}
+          </div>
+        </div>
+      </div>
     </Page>
   );
 };
+
+export const ColorsPage = withSearch(Colors, {
+  words: 'colour theme',
+  items: [
+    { title: 'Color set', words: Object.values(PRESETS).map((p) => p.name).join(' '), selector: '#color-preset' },
+    { title: 'Remove my own colors' },
+    ...PAGE_COLORS.map((def) => ({
+      title: def.label,
+      help: def.help,
+      words: `${def.group} color${def.bold === undefined ? '' : ' bold'}`,
+      selector: `.color-row[data-color="${def.key}"]`,
+    })),
+  ],
+});

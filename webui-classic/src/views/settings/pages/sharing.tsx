@@ -14,11 +14,13 @@ import { browsePath } from '../../../components/FileBrowser';
 import { useAccess } from '../../../lib/access';
 import { formatDate, formatDuration, formatSize, formatSpeed } from '../../../lib/format';
 import { fsName } from '../../../lib/fsPath';
+import { withSearch } from '../../../lib/settingsSearch';
 import { reportError, useApp } from '../../../store/app';
 import { socket } from '../../../store/session';
 import { confirm } from '../../../store/ui';
 import { Facts, LoadError, SimpleList, useApiData } from '../data';
 import { Fields, Note, Page, Section, useRemoteForm } from '../form';
+import { settingsPage } from './common';
 
 const HIDDEN_PROFILE = 1;
 
@@ -87,7 +89,7 @@ const removeRoot = async (root: ShareRoot) => {
   }
 };
 
-export const SharedFoldersPage = () => {
+const SharedFolders = () => {
   const access = useAccess();
   const canEdit = access('share_edit');
   const { data, error } = useApiData<ShareRoot[]>('share_roots', ROOT_EVENTS);
@@ -164,16 +166,18 @@ export const SharedFoldersPage = () => {
   );
 };
 
+export const SharedFoldersPage = withSearch(SharedFolders, {
+  words: 'share directory',
+  items: [
+    { title: 'Add folder', permission: 'share_edit' },
+    { title: 'Refresh all', permission: 'share_edit' },
+    { title: 'Refresh incoming', permission: 'share_edit' },
+  ],
+});
+
 const REFRESH_KEYS = ['refresh_time', 'refresh_time_incoming', 'refresh_startup', 'refresh_threading'];
 
-export const RefreshPage = () => {
-  const form = useRemoteForm(REFRESH_KEYS);
-  return (
-    <Page form={form}>
-      <Fields form={form} keys={REFRESH_KEYS} />
-    </Page>
-  );
-};
+export const RefreshPage = settingsPage(REFRESH_KEYS);
 
 const askName = (title: string, confirmLabel: string, name: string, save: (name: string) => Promise<unknown>) =>
   showForm({
@@ -198,7 +202,7 @@ const cloneProfile = async (source: ShareProfile, name: string) => {
   }
 };
 
-export const ProfilesPage = () => {
+const Profiles = () => {
   const access = useAccess();
   const canEdit = access('share_edit');
   const { data, error } = useApiData<ShareProfile[]>('share_profiles', PROFILE_EVENTS);
@@ -263,10 +267,12 @@ export const ProfilesPage = () => {
   );
 };
 
+export const ProfilesPage = withSearch(Profiles, { items: [{ title: 'Add profile', words: 'share profile' }] });
+
 const SHARING_KEYS = ['share_hidden', 'share_no_empty_dirs', 'share_no_zero_byte', 'share_follow_symlinks', 'share_max_size'];
 const SKIPLIST_KEYS = ['share_skiplist', 'share_skiplist_regex'];
 
-export const SharingOptionsPage = () => {
+const SharingOptions = () => {
   const form = useRemoteForm([...SHARING_KEYS, ...SKIPLIST_KEYS]);
   return (
     <Page form={form}>
@@ -277,6 +283,12 @@ export const SharingOptionsPage = () => {
     </Page>
   );
 };
+
+export const SharingOptionsPage = withSearch(SharingOptions, {
+  keys: [...SHARING_KEYS, ...SKIPLIST_KEYS],
+  items: [{ title: 'Skiplist' }],
+  describe: (key) => (SKIPLIST_KEYS.includes(key) ? { words: 'skiplist' } : {}),
+});
 
 const hashStatusText = (stats: HashStats) =>
   stats.pause_forced ? 'Paused' : stats.hashers > 0 ? `Running (${stats.hashers} threads)` : 'Idle';
@@ -403,7 +415,7 @@ const HashDatabase = ({ canEdit }: { canEdit: boolean }) => {
 
 const HASH_KEYS = ['max_hash_speed', 'max_total_hashers', 'max_volume_hashers'];
 
-export const HashingPage = () => {
+const Hashing = () => {
   const access = useAccess();
   const form = useRemoteForm(HASH_KEYS);
   return (
@@ -419,7 +431,16 @@ export const HashingPage = () => {
   );
 };
 
-export const ExcludesPage = () => {
+export const HashingPage = withSearch(Hashing, {
+  keys: HASH_KEYS,
+  items: [
+    { title: 'Hash database', permission: 'share_view' },
+    { title: 'Verify integrity of hash data', permission: 'share_edit' },
+    { title: 'Optimize now', words: 'hash database maintenance', permission: 'share_edit' },
+  ],
+});
+
+const Excludes = () => {
   const access = useAccess();
   const canEdit = access('share_edit');
   const { data, error } = useApiData<string[]>('share/excludes', [
@@ -463,3 +484,11 @@ export const ExcludesPage = () => {
     </Page>
   );
 };
+
+export const ExcludesPage = withSearch(Excludes, {
+  words: 'folder directory',
+  items: [
+    { title: 'Exclude a directory', permission: 'share_edit' },
+    { title: 'Refresh share', permission: 'share_edit' },
+  ],
+});

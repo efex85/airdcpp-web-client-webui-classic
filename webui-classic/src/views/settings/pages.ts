@@ -1,6 +1,6 @@
 // The settings pages and who may see them
-import type { ComponentType } from 'react';
 import type { Permission } from '../../lib/access';
+import type { SettingsComponent } from '../../lib/settingsSearch';
 import { ApplicationPage, HubStatsPage, ShareStatsPage, TransferStatsPage } from './pages/about';
 import {
   DetectionPage,
@@ -38,7 +38,7 @@ import { AppearancePage, BrowserMiscPage, EventsPage, HistoriesPage, Notificatio
 export interface SettingsPage {
   id: string;
   title: string;
-  component: ComponentType;
+  component: SettingsComponent;
   /** Required permission; null if everyone may see the page */
   permission: Permission | null;
   advanced: boolean;
@@ -49,7 +49,7 @@ export interface PageGroup {
   pages: SettingsPage[];
 }
 
-type Entry = [id: string, title: string, component: ComponentType, permission?: Permission | null];
+type Entry = [id: string, title: string, component: SettingsComponent, permission?: Permission | null];
 
 const group = (title: string, basic: Entry[], advanced: Entry[] = []): PageGroup => {
   const page =

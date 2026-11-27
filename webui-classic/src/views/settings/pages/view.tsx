@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { SettingDefinition, SettingValues } from '../../../api/settingsTypes';
 import { requestPermission, nativeState } from '../../../lib/browserNotification';
+import { withSearch } from '../../../lib/settingsSearch';
 import {
   MISC_DEFINITIONS,
   NOTIFICATION_DEFINITIONS,
@@ -8,8 +9,10 @@ import {
   useLocalSettings,
 } from '../../../store/localSettings';
 import { Fields, Note, Page, Section, useForm, useRemoteForm } from '../form';
+import { settingsPage } from './common';
 
-const useLocalForm = (definitions: SettingDefinition[]) =>
+/** Settings that are stored in this browser */
+export const useLocalForm = (definitions: SettingDefinition[]) =>
   useForm({
     canSave: true,
     load: async () => ({ definitions, saved: { ...useLocalSettings.getState() } as unknown as SettingValues }),
@@ -42,7 +45,10 @@ const BrowserPermission = () => {
   );
 };
 
-export const NotificationsPage = () => {
+const localEntries = (definitions: SettingDefinition[]) =>
+  definitions.map((def) => ({ title: def.title, help: def.help, selector: `[data-key="${def.key}"]` }));
+
+const Notifications = () => {
   const form = useLocalForm(NOTIFICATION_DEFINITIONS);
   return (
     <Page form={form}>
@@ -55,7 +61,12 @@ export const NotificationsPage = () => {
   );
 };
 
-export const BrowserMiscPage = () => {
+export const NotificationsPage = withSearch(Notifications, {
+  words: 'popup',
+  items: [...localEntries(NOTIFICATION_DEFINITIONS), { title: 'Notifications of the browser', words: 'allow' }],
+});
+
+const BrowserMisc = () => {
   const form = useLocalForm(MISC_DEFINITIONS);
   return (
     <Page form={form}>
@@ -65,11 +76,13 @@ export const BrowserMiscPage = () => {
   );
 };
 
+export const BrowserMiscPage = withSearch(BrowserMisc, { items: localEntries(MISC_DEFINITIONS) });
+
 const CACHE_KEYS = ['history_hub_messages', 'history_pm_messages', 'history_log_messages'];
 const SESSION_KEYS = ['history_hub_sessions', 'history_pm_sessions', 'history_filelist_sessions'];
 const HISTORY_KEYS = ['history_search_max', 'history_download_max', 'history_chat_log_lines'];
 
-export const HistoriesPage = () => {
+const Histories = () => {
   const form = useRemoteForm([...HISTORY_KEYS, ...CACHE_KEYS, ...SESSION_KEYS]);
   return (
     <Page form={form}>
@@ -84,14 +97,21 @@ export const HistoriesPage = () => {
   );
 };
 
-const settingsPage = (keys: string[]) => () => {
-  const form = useRemoteForm(keys);
-  return (
-    <Page form={form}>
-      <Fields form={form} keys={keys} />
-    </Page>
-  );
-};
+export const HistoriesPage = withSearch(Histories, {
+  keys: [...HISTORY_KEYS, ...CACHE_KEYS, ...SESSION_KEYS],
+  // Names such as "Private chat" only make sense with the title of their group
+  describe: (key, name) => {
+    if (CACHE_KEYS.includes(key)) {
+      return { title: `${name} (cached messages)` };
+    }
+
+    return SESSION_KEYS.includes(key) ? { title: `${name} (previously opened)` } : {};
+  },
+  items: [
+    { title: 'Maximum number of messages to cache' },
+    { title: 'Maximum number of previously opened sessions' },
+  ],
+});
 
 export const EventsPage = settingsPage([
   'report_uploads',
