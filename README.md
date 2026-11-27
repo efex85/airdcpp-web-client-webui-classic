@@ -1,4 +1,6 @@
-# AirDC++ Web Client mod-xl
+# AirDC++ Web Client WebUI-Classic
+
+Prebuilt image can be found at https://hub.docker.com/r/rafsis/airdcpp-web-client-webui-classic
 
 A Debian based Docker image of AirDC++ Web Client with:
 
