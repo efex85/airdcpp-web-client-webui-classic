@@ -1,4 +1,4 @@
-import { File, Folder, Pause, Play, Search, Trash2 } from 'lucide-react';
+import { File, Folder, Pause, Play, Search, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { browseUser, copyText, openPrivateChat } from '../actions';
 import { pauseAll, removeUsersFromQueue, resumeAll, shareBundles } from '../actions/queue';
@@ -295,7 +295,8 @@ const Sources = ({ bundle }: { bundle: QueueBundle }) => {
   );
 };
 
-const Details = ({ bundle, onClose }: { bundle: QueueBundle; onClose?: () => void }) => {
+/** The files and sources of a bundle; on small screens they replace the queue instead of sharing the window */
+const Details = ({ bundle, mobile, onClose }: { bundle: QueueBundle; mobile: boolean; onClose: () => void }) => {
   const [tab, setTab] = useState<'files' | 'sources'>('files');
   return (
     <div className="subpane">
@@ -306,9 +307,13 @@ const Details = ({ bundle, onClose }: { bundle: QueueBundle; onClose?: () => voi
           </button>
         ))}
         <span className="subpane-title">{bundle.name}</span>
-        {onClose && (
-          <button type="button" className="close-details" onClick={onClose}>
+        {mobile ? (
+          <button type="button" onClick={onClose}>
             Back to the queue
+          </button>
+        ) : (
+          <button type="button" className="subpane-close" aria-label="Close files and sources" title="Close" onClick={onClose}>
+            <X size={14} />
           </button>
         )}
       </div>
@@ -323,6 +328,7 @@ export const Queue = () => {
   const canEdit = useAccess()('queue_edit');
   const [selected, setSelected] = useState<number | null>(null);
   const [details, setDetails] = useState<number | null>(null);
+  const [closed, setClosed] = useState(0);
   const shownId = mobile ? details : selected;
   const shown = items.find((b) => b.id === shownId);
 
@@ -359,6 +365,7 @@ export const Queue = () => {
       icon={icon}
       defaultSort={{ column: 'added', desc: true }}
       onSelect={(s) => setSelected(s.length === 1 ? s[0].id : null)}
+      clearSelection={closed}
       onDelete={(s) => void removeBundles(s)}
       menu={menu}
       mobileTap="menu"
@@ -366,12 +373,18 @@ export const Queue = () => {
     />
   );
 
+  // The row is deselected too, so that clicking it opens the view again
+  const closeDetails = () => {
+    setSelected(null);
+    setClosed((n) => n + 1);
+  };
+
   return (
     <div className="view">
       <div className="view-main">
         {mobile ? (
           shown ? (
-            <Details key={shown.id} bundle={shown} onClose={() => setDetails(null)} />
+            <Details key={shown.id} bundle={shown} mobile onClose={() => setDetails(null)} />
           ) : (
             list
           )
@@ -381,7 +394,7 @@ export const Queue = () => {
             direction="column"
             initial={220}
             first={list}
-            second={shown ? <Details key={shown.id} bundle={shown} /> : null}
+            second={shown ? <Details key={shown.id} bundle={shown} mobile={false} onClose={closeDetails} /> : null}
           />
         )}
       </div>

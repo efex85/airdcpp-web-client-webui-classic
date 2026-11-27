@@ -1255,6 +1255,18 @@ textarea[aria-invalid='true'] {
   border-color: var(--accent);
 }
 
+/* Closes the details below a list; looks like the button that closes a window */
+.segmented .subpane-close {
+  display: flex;
+  padding: 3px 9px;
+}
+
+.segmented .subpane-close:hover {
+  color: #fff;
+  background: #a4262c;
+  border-color: var(--red);
+}
+
 .subpane-title {
   flex: 1;
   min-width: 0;

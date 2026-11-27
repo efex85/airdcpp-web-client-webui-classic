@@ -292,6 +292,9 @@ needs a client that supports this kind of search.
 
 ## Download queue
 
+- Selecting a download shows its **Files** and **Sources** below the list. The **×** in the top right corner of that
+  view closes it and deselects the download; select it again to bring the view back. On a phone, choose **Files and
+  sources** in the menu of a download and leave with **Back to the queue**.
 - **Pause all** pauses every download. **Resume all** gives every download automatic priority again, which also
   replaces priorities that you have set by hand. To set one priority for several downloads, select them (Ctrl+A
   selects all) and use **Priority** in their menu.

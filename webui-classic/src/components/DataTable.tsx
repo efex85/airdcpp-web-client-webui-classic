@@ -56,6 +56,8 @@ interface Props<T> {
   onDelete?: (items: T[]) => void;
   /** Called when the selection changes */
   onSelect?: (items: T[]) => void;
+  /** Changing this number clears the selection */
+  clearSelection?: number;
   /** Tap on small screens (default: activate, or the menu for lists without a default action) */
   mobileTap?: Tap | ((item: T) => Tap);
   /** Keeps items of a lower rank first regardless of the sort order (folders before files) */
@@ -91,6 +93,7 @@ export function DataTable<T>({
   onActivate,
   onDelete,
   onSelect,
+  clearSelection,
   mobileTap,
   rank,
   empty,
@@ -160,6 +163,12 @@ export function DataTable<T>({
   useEffect(() => {
     onSelect?.(selected);
   }, [signature]);
+
+  useEffect(() => {
+    if (clearSelection) {
+      setSelection(emptySelection);
+    }
+  }, [clearSelection]);
 
   useEffect(() => {
     if (selecting && !selected.length) {
