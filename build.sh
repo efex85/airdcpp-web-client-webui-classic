@@ -20,7 +20,7 @@ cd "$(dirname "$0")"
 # Everything that the Dockerfile reads from this folder
 MISSING=""
 for f in Dockerfile entrypoint.sh .airdcpp daemon-hubcommands.patch daemon-system-uptime.patch \
-         daemon-user-data.patch daemon-emoticon-packs.patch list-runtime-deps.sh \
+         daemon-user-data.patch daemon-emoticon-packs.patch daemon-failed-connections.patch list-runtime-deps.sh \
          webui-classic/package.json webui-classic/package-lock.json webui-classic/index.html webui-classic/src; do
   [ -e "$f" ] || MISSING="$MISSING $f"
 done
