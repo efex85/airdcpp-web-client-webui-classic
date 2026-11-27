@@ -6,7 +6,7 @@
 ARG distro=trixie-slim
 
 # --- Stage 1: build the web UI (its source is in this repository) ---
-FROM node:22-bookworm-slim AS webui-build
+FROM node:24-trixie-slim AS webui-build
 WORKDIR /webui-classic
 COPY webui-classic/package.json webui-classic/package-lock.json ./
 RUN npm ci --no-audit --no-fund
