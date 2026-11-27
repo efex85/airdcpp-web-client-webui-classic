@@ -216,6 +216,12 @@ export const applyHomeSetting = (enabled: boolean) => {
   }
 };
 
+/** The window that was used before the shown one */
+export const lastUsedWindow = (): string | undefined => {
+  const { tabs, active } = useApp.getState();
+  return [...history].reverse().find((key) => key !== active && tabs.includes(key));
+};
+
 export const activate = (key: string) => {
   useApp.setState({ active: key });
   persistTabs();

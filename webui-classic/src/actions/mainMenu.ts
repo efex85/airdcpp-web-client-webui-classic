@@ -20,6 +20,7 @@ import {
   showWindow,
   userMenu,
 } from '.';
+import { activeKeys } from './shortcuts';
 
 export const toggleAway = () =>
   socket.post('system/away', { away: !useApp.getState().away }).catch(reportError('Away'));
@@ -48,7 +49,7 @@ const about = () => {
 };
 
 const refreshEntries = (): MenuEntry[] => [
-  { label: 'Refresh share', onClick: () => void refreshShare() },
+  { label: 'Refresh share', keys: activeKeys('refresh_share'), onClick: () => void refreshShare() },
   { label: 'Refresh incoming folders', onClick: () => void refreshShare(true) },
 ];
 
@@ -72,10 +73,10 @@ export const refreshMenu = (): { entries: MenuEntry[]; more?: () => Promise<Menu
 });
 
 export const fileMenu = (): MenuEntry[] => [
-  { label: 'Quick connect…', onClick: () => void quickConnect() },
-  { label: 'Open own file list', onClick: () => void openOwnList() },
+  { label: 'Quick connect…', keys: activeKeys('quick_connect'), onClick: () => void quickConnect() },
+  { label: 'Open own file list', keys: activeKeys('own_list'), onClick: () => void openOwnList() },
   'separator',
-  { label: 'Settings', onClick: () => openSettings() },
+  { label: 'Settings', keys: activeKeys('settings'), onClick: () => openSettings() },
   { label: 'Shared folders', disabled: !hasAccess('share_view'), onClick: () => openSettings('share') },
   'separator',
   ...refreshEntries(),
@@ -88,7 +89,7 @@ export const fileMenu = (): MenuEntry[] => [
     },
   },
   'separator',
-  { label: 'Away', checked: useApp.getState().away, onClick: () => void toggleAway() },
+  { label: 'Away', keys: activeKeys('away'), checked: useApp.getState().away, onClick: () => void toggleAway() },
   { label: 'Log out', onClick: () => void askLogout() },
 ];
 
@@ -106,14 +107,21 @@ export const favoriteMenu = (): MenuEntry[] => {
 };
 
 export const viewMenu = (): MenuEntry[] => [
-  ...(useApp.getState().homeEnabled ? [{ label: 'Home', onClick: () => showWindow('home') }] : []),
-  { label: 'System log', onClick: () => showWindow('syslog') },
-  { label: 'Favorite hubs', onClick: () => showWindow('favorites') },
-  { label: 'Download queue', onClick: () => showWindow('queue') },
-  { label: 'Transfers', onClick: () => showWindow('transfers') },
-  { label: 'New search', onClick: () => openSearch() },
+  ...(useApp.getState().homeEnabled
+    ? [{ label: 'Home', keys: activeKeys('home'), onClick: () => showWindow('home') }]
+    : []),
+  { label: 'System log', keys: activeKeys('syslog'), onClick: () => showWindow('syslog') },
+  { label: 'Favorite hubs', keys: activeKeys('favorites'), onClick: () => showWindow('favorites') },
+  { label: 'Download queue', keys: activeKeys('queue'), onClick: () => showWindow('queue') },
+  { label: 'Transfers', keys: activeKeys('transfers'), onClick: () => showWindow('transfers') },
+  { label: 'New search', keys: activeKeys('search'), onClick: () => openSearch() },
   'separator',
-  { label: 'Transfer pane', checked: useApp.getState().showTransfers, onClick: toggleTransferPane },
+  {
+    label: 'Transfer pane',
+    keys: activeKeys('transfer_pane'),
+    checked: useApp.getState().showTransfers,
+    onClick: toggleTransferPane,
+  },
 ];
 
 export const transferMenu = (): MenuEntry[] => [
@@ -131,7 +139,12 @@ export const windowListMenu = (): MenuEntry[] => {
   const state = useApp.getState();
   const count = (type: string) => state.tabs.filter((key) => windowType(key) === type).length;
   return [
-    { label: 'Close the current window', disabled: !state.active, onClick: () => void closeWindow(state.active) },
+    {
+      label: 'Close the current window',
+      keys: activeKeys('close_window'),
+      disabled: !state.active,
+      onClick: () => void closeWindow(state.active),
+    },
     { label: 'Close all private messages', disabled: !count('pm'), onClick: () => closeAll('pm') },
     { label: 'Close all file lists', disabled: !count('filelist'), onClick: () => closeAll('filelist') },
     { label: 'Close all searches', disabled: !count('search'), onClick: () => closeAll('search') },

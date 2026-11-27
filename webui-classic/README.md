@@ -10,7 +10,7 @@ between devices and the emoticon packs need three small daemon patches of this i
 
 | Window           | Highlights                                                                                                                                              |
 |------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Home             | system statistics, RSS feeds and notes                                                                                                                  |
+| Home             | system information, RSS feeds and notes                                                                                                                 |
 | Hubs             | chat with clickable magnet, release and web links, Tab nick completion, chat commands; password and redirect prompts                                    |
 | User list        | operators/bots/users groups, column sorting and selection, filter, hub user commands                                                                    |
 | Private messages | including the transport encryption state                                                                                                                |
@@ -35,7 +35,7 @@ changed, depends on the permissions of the web user.
   window with unsaved changes asks first. This is the same on every page with settings, also on those under
   **View**. Lists (folders, profiles, users and so on) are changed right away through their dialogs, and buttons
   such as "Detect now" or "Pause" act at once.
-- **Home and startup**, **Colors**, **Tab highlights** and **Emoji** are synced between your devices. If one of
+- **Home and startup**, **Colors**, **Tab highlights**, **Emoji** and **Shortcuts** are synced between your devices. If one of
   these pages is changed on another device while you edit it, the change appears on your page; where both changed
   the same thing, yours stays and is what **Save changes** stores.
 - **Search settings**, the box at the top, finds pages and settings by name. Every word has to match, in the name
@@ -67,9 +67,10 @@ changed, depends on the permissions of the web user.
 
 ## Home
 
-- **System stats**, from top to bottom: system and client uptime; current speeds, running transfers, downloaded
-  and uploaded this session and in total, the ratio (ul/dl) and the download queue; connected hubs and share size;
-  hashing; disk space. Inside Docker the system uptime is normally that of the host machine.
+- **System information**, from top to bottom: system and client uptime; current speeds, running transfers,
+  downloaded and uploaded this session and in total, the ratio (ul/dl) and the download queue; the
+  [IPv4 and IPv6 address](#ip-addresses), connected hubs and share size; disk space; hashing. Inside Docker the
+  system uptime is normally that of the host machine. Its text can be [marked and copied](#copying).
 - **RSS feed**: add as many as you like. Each has its own address, title and refresh interval, and a refresh
   button. Click an entry to open its link or to search for its title; the search starts at once. The client
   fetches the feeds, as in the official web UI.
@@ -79,21 +80,45 @@ changed, depends on the permissions of the web user.
 - **Recent searches**: the words you searched for last, newest first. Click one to search for it again, with the
   default search options.
 
-**+ Add widget** at the top lists the available widgets; of System stats, Recent PMs and Recent searches there is
-only one each. **⋮** on a widget changes or moves it, and **×** removes it.
+**+ Add widget** at the top lists the available widgets; of System information, Recent PMs and Recent searches there
+is only one each. **⋮** on a widget changes or moves it, and **×** removes it.
 
-All boxes are equally high. When System stats needs more room than usual (large text, several disks), the other
-boxes grow with it.
+All boxes are equally high: at least a normal height, and as high as System information needs. With all its
+sections it is a little higher than that, and more so with large text or several disks; the other boxes grow with it.
 
-**Height**: all widgets except System stats can be made taller under **⋮ → Height**: Normal, Tall (2 boxes) or Extra tall
+**Height**: all widgets except System information can be made taller under **⋮ → Height**: Normal, Tall (2 boxes) or Extra tall
 (3 boxes). The boxes are placed from left to right, row by row, and a tall box also occupies the place below it.
 With room for three columns, the order *A, B (tall), C, D, E* gives A and D stacked on the left, B in the middle
 and C and E stacked on the right. Use **Move earlier** and **Move later** to change the order. The number of
 columns depends on the width of the window; a phone shows one.
 
 On a **phone** the boxes size themselves: each is as high as its content, at most the normal height (System
-stats as high as it needs), and longer feeds, notes and lists scroll inside their box. The heights chosen under **⋮ → Height** only apply to larger screens. They
+information as high as it needs), and longer feeds, notes and lists scroll inside their box. The heights chosen under **⋮ → Height** only apply to larger screens. They
 are kept when you use a phone, and can also be changed there.
+
+### IP addresses
+
+The lines **IPv4 address** and **IPv6 address** show the first of these that applies:
+
+| Shown                          | When                                                                                    |
+|--------------------------------|-----------------------------------------------------------------------------------------|
+| **Disabled**                   | the protocol is switched off under **Settings → Connectivity**                          |
+| **Disabled by auto detection** | the automatic detection switched it off (IPv6: no public IPv6 address was found)         |
+| an address                     | the one that your connected hubs report for you; several if they report different ones  |
+| an address                     | otherwise the external address that the client uses (set by hand or found through UPnP) |
+| **Not known**                  | none of the above, for example while no hub is connected                                |
+
+Hover over a line to see where it comes from, or why there is no address. Not every hub reports addresses (NMDC hubs
+only with the UserIP feature). The lines are refreshed when a hub connects or disconnects, and every 30 seconds.
+Knowing whether a protocol is disabled needs the permission to view the settings, and the addresses that hubs report
+the permission to view the hubs; with neither, the lines are left out.
+
+### Copying
+
+Mark text in System information with the mouse, or by touching and holding on a phone, and copy it with your keyboard
+or the menu of the browser. While
+text of the box is marked, its figures stand still so that the mark isn't lost; they continue once you click
+elsewhere. The buttons keep working.
 
 ### Hashing and disk space
 
@@ -193,6 +218,7 @@ written as the character itself. On NMDC hubs such characters get lost unless th
 |--------------------------------------------------------|-----------------------------------------------------------------------|
 | Home widgets, feeds and notes                          | text sizes, chat font, timestamps                                     |
 | colors, tab highlights and emoji                       | notifications and the other browser settings                          |
+| keyboard shortcuts and thumb buttons                   |                                                                       |
 | "Show the Home tab", "Open the system log …"           | tab order, column widths, pane sizes, whether the transfer pane shows |
 
 Synced data is stored by the client in `WebUserData.json` in its configuration directory. It isn't encrypted.
@@ -244,6 +270,44 @@ may not browse the files of the server type the folder instead.
 
 **Refresh in share** (menu of a file or folder, or the button next to the path) rescans a shared folder. New files
 appear once the client has hashed them; use **Reload** if the list doesn't show them yet.
+
+## Keyboard shortcuts and thumb buttons
+
+| Action                         | Keys          | Mouse          |
+|--------------------------------|---------------|----------------|
+| Previous tab                   | Alt+Shift+←   | back button    |
+| Next tab                       | Alt+Shift+→   | forward button |
+| Last used window               | Alt+Q         |                |
+| Close the current window       | Alt+W         |                |
+| New search                     | Alt+N         |                |
+| Home                           | Alt+M         |                |
+| Favorite hubs                  | Alt+A         |                |
+| Quick connect                  | Alt+C         |                |
+| Download queue                 | Alt+U         |                |
+| Transfers                      | Alt+R         |                |
+| Show or hide the transfer pane | Alt+P         |                |
+| Open own file list             | Alt+L         |                |
+| System log                     | Alt+G         |                |
+| Settings                       | Alt+O         |                |
+| Refresh share                  | none          |                |
+| Away mode on or off            | none          |                |
+
+On a Mac, Alt is the Option key. The menus show the keys next to their entries.
+
+Under **Settings → View → Shortcuts** you can switch all keyboard shortcuts, the thumb buttons, or single shortcuts
+off, and change them:
+
+- Click the keys of a shortcut and press new ones. Esc cancels, Backspace removes them and Tab moves on.
+- Choose the thumb button of a shortcut in its list, or click its keys and then press the button with the pointer on
+  that field.
+- Keys or a button that another action had are taken from it, and the page says so.
+- Keys need Ctrl or Alt, except function keys. Combinations for selecting, copying and pasting can't be used, nor
+  can those that browsers keep for themselves, such as Ctrl+W, Ctrl+T and Ctrl+Tab. A browser, the operating system
+  or an extension may reserve others too; choose different keys if a shortcut doesn't react.
+
+Shortcuts also work while you type in a field, but not while a dialog is open. A thumb button that has a shortcut no
+longer goes back or forward in the history of the browser; one without a shortcut, or switched off, does so as usual.
+If your browser or mouse software handles the buttons itself so that the page never gets them, they can't switch tabs.
 
 ## Using the mouse and keyboard
 

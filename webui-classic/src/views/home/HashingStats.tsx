@@ -1,10 +1,11 @@
-// Hashing in the System stats widget
+// Hashing in the System information widget
 import { Pause, Play, Square } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { HashStats } from '../../api/settingsTypes';
 import { Progress } from '../../components/Progress';
 import { useAccess } from '../../lib/access';
 import { hashingBusy, hashingProgress, hashingStatus, hashingText } from '../../lib/hashing';
+import { useHeld } from '../../lib/useSelecting';
 import { reportError, useApp } from '../../store/app';
 import { socket } from '../../store/session';
 import { confirm } from '../../store/ui';
@@ -14,10 +15,13 @@ const INTERVAL = 2000;
 const load = (done: (stats: HashStats) => void) =>
   socket.get<HashStats>('hash/stats').then(done, () => undefined);
 
-export const HashingStats = ({ active }: { active: boolean }) => {
+export const HashingStats = ({ active, held }: { active: boolean; held: boolean }) => {
   const access = useAccess();
   const generation = useApp((s) => s.generation);
   const [stats, setStats] = useState<HashStats | null>(null);
+
+  // The text may stand still; the buttons always follow the client
+  const shown = useHeld(stats, held);
 
   useEffect(() => {
     if (!active) {
@@ -29,7 +33,7 @@ export const HashingStats = ({ active }: { active: boolean }) => {
     return () => clearInterval(timer);
   }, [active, generation]);
 
-  if (!stats) {
+  if (!stats || !shown) {
     return null;
   }
 
@@ -48,7 +52,7 @@ export const HashingStats = ({ active }: { active: boolean }) => {
       <header>
         <h3>Hashing</h3>
         <span className="grow muted" data-stat="hash-status">
-          {hashingStatus(stats)}
+          {hashingStatus(shown)}
         </span>
         {access('share_edit') && (
           <>
@@ -63,7 +67,7 @@ export const HashingStats = ({ active }: { active: boolean }) => {
           </>
         )}
       </header>
-      <Progress value={hashingProgress(stats)} text={hashingText(stats)} />
+      <Progress value={hashingProgress(shown)} text={hashingText(shown)} />
     </section>
   );
 };

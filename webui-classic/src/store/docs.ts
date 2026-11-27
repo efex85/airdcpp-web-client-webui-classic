@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from 'react';
 import { EMOJI_DEFAULTS, sanitizeEmoji, type EmojiSettings } from '../lib/emoji';
 import { merge, mergeText } from '../lib/merge';
+import { sanitizeShortcuts, SHORTCUT_DEFAULTS, type ShortcutSettings } from '../lib/shortcuts';
 import { sanitizeStartup, STARTUP_DEFAULTS, type StartupSettings } from '../lib/startup';
 import { SyncedDoc, type Cache, type SyncStatus, type Transport } from '../lib/syncedDoc';
 import { DEFAULT_COLORS, sanitizeColors, type ColorSettings } from '../lib/theme';
@@ -37,6 +38,13 @@ export const emojiDoc = new SyncedDoc<EmojiSettings>({
   merge,
 });
 
+export const shortcutsDoc = new SyncedDoc<ShortcutSettings>({
+  key: 'classic_shortcuts',
+  defaults: SHORTCUT_DEFAULTS,
+  sanitize: sanitizeShortcuts,
+  merge,
+});
+
 const noteDocs = new Map<string, SyncedDoc<string>>();
 
 interface Connection {
@@ -47,7 +55,7 @@ interface Connection {
 let connection: Connection | null = null;
 let errorHandler: ((error: Error) => void) | null = null;
 
-const fixed = [startupDoc, colorsDoc, widgetsDoc, emojiDoc] as SyncedDoc<any>[];
+const fixed = [startupDoc, colorsDoc, widgetsDoc, emojiDoc, shortcutsDoc] as SyncedDoc<any>[];
 const allDocs = (): SyncedDoc<any>[] => [...fixed, ...noteDocs.values()];
 
 /** The text of a notes widget */
@@ -87,7 +95,7 @@ export const syncAll = async () => {
     return;
   }
 
-  await Promise.all([startupDoc.sync(), colorsDoc.sync(), emojiDoc.sync()]);
+  await Promise.all([startupDoc.sync(), colorsDoc.sync(), emojiDoc.sync(), shortcutsDoc.sync()]);
   // The widgets first, so that the text of removed notes isn't restored
   await widgetsDoc.sync();
   await syncNotes();

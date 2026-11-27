@@ -1,12 +1,14 @@
-// Uptime, transfers, share, hashing and disk space
+// Uptime, transfers, addresses, share, disk space and hashing
 import { ArrowDown, ArrowUp } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAccess } from '../../lib/access';
 import { formatSize, formatUptime } from '../../lib/format';
+import { useHeld, useSelecting } from '../../lib/useSelecting';
 import { useApp } from '../../store/app';
 import { socket } from '../../store/session';
 import { DiskStats } from './DiskStats';
 import { HashingStats } from './HashingStats';
+import { useAddresses } from './useAddresses';
 
 interface Transferred {
   session_downloaded: number;
@@ -44,13 +46,18 @@ const Row = ({ title, children }: { title: string; children: ReactNode }) => (
 export const StatsWidget = ({ active }: { active: boolean }) => {
   const access = useAccess();
   const system = useApp((s) => s.login?.system_info);
-  const stats = useApp((s) => s.stats);
-  const hubs = useApp((s) => s.hubs);
-  const shareSize = useApp((s) => s.shareSize);
   const generation = useApp((s) => s.generation);
-  const now = useNow(active);
-  const [transferred, setTransferred] = useState<Transferred | null>(null);
+  const [loaded, setTransferred] = useState<Transferred | null>(null);
   const transfers = access('transfers');
+  // While text is selected the figures stand still, so that it can be copied
+  const ref = useRef<HTMLDivElement>(null);
+  const held = useSelecting(ref);
+  const stats = useHeld(useApp((s) => s.stats), held);
+  const hubs = useHeld(useApp((s) => s.hubs), held);
+  const shareSize = useHeld(useApp((s) => s.shareSize), held);
+  const now = useHeld(useNow(active), held);
+  const transferred = useHeld(loaded, held);
+  const addresses = useHeld(useAddresses(active), held);
 
   // The totals aren't part of the statistics events
   useEffect(() => {
@@ -73,7 +80,7 @@ export const StatsWidget = ({ active }: { active: boolean }) => {
   const uptime = (started: number | undefined) => (started ? formatUptime(now - started) : '');
 
   return (
-    <div className="home-stats">
+    <div className="home-stats" ref={ref}>
       <table>
         <tbody>
           {!!system?.system_started && (
@@ -141,9 +148,26 @@ export const StatsWidget = ({ active }: { active: boolean }) => {
       ) : (
         <p className="muted">You don't have permission to see the transfer statistics.</p>
       )}
-      {(access('hubs_view') || shareSize !== null) && (
+      {(access('hubs_view') || shareSize !== null || addresses) && (
         <table>
           <tbody>
+            {addresses?.map(([family, state]) => (
+              <Row key={family} title={family === 'v4' ? 'IPv4 address' : 'IPv6 address'}>
+                <td className="stat-address" data-stat={`ip-${family}`}>
+                  {state.addresses ? (
+                    state.addresses.map(({ ip, detail }) => (
+                      <div key={ip} title={detail}>
+                        {ip}
+                      </div>
+                    ))
+                  ) : (
+                    <span className="muted" title={state.detail}>
+                      {state.text}
+                    </span>
+                  )}
+                </td>
+              </Row>
+            ))}
             {access('hubs_view') && (
               <Row title="Hubs connected">
                 <td>
@@ -159,8 +183,8 @@ export const StatsWidget = ({ active }: { active: boolean }) => {
           </tbody>
         </table>
       )}
-      {access('share_view') && <HashingStats active={active} />}
-      <DiskStats active={active} />
+      <DiskStats active={active} held={held} />
+      {access('share_view') && <HashingStats active={active} held={held} />}
     </div>
   );
 };

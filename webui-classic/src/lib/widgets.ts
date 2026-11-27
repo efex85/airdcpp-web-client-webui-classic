@@ -21,7 +21,7 @@ export interface HomeWidgets {
 }
 
 export const WIDGET_NAMES: Record<WidgetType, string> = {
-  stats: 'System stats',
+  stats: 'System information',
   rss: 'RSS feed',
   notes: 'Notes',
   pms: 'Recent PMs',

@@ -9,6 +9,7 @@ import { TabBar } from './components/TabBar';
 import { Toolbar } from './components/Toolbar';
 import { windowInfo } from './lib/windows';
 import { useIsMobile } from './lib/useIsMobile';
+import { useShortcuts } from './lib/useShortcuts';
 import { useApp, windowId, windowType } from './store/app';
 import { colorsDoc, useDoc } from './store/docs';
 import { useLocalSettings } from './store/localSettings';
@@ -102,6 +103,7 @@ const Main = () => {
   const mobile = useIsMobile();
   const showTransfers = useApp((s) => s.showTransfers && s.active !== 'transfers');
   const reconnecting = useApp((s) => s.connection !== 'connected');
+  useShortcuts();
 
   return (
     <div className={`app${mobile ? ' mobile' : ''}`}>

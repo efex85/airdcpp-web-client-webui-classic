@@ -3,6 +3,8 @@ import { Check, ChevronRight, ChevronDown } from 'lucide-react';
 import { closeMenu, useUi, type MenuEntry } from '../store/ui';
 import { useIsMobile } from '../lib/useIsMobile';
 import { tidySeparators } from '../lib/menu';
+import { combinationLabel } from '../lib/shortcuts';
+import { isMac } from '../lib/platform';
 
 const MenuList = ({ items, mobile }: { items: MenuEntry[]; mobile: boolean }) => {
   const [open, setOpen] = useState<number | null>(null);
@@ -37,6 +39,7 @@ const MenuList = ({ items, mobile }: { items: MenuEntry[]; mobile: boolean }) =>
               aria-expanded={submenu ? isOpen : undefined}
               className={`menu-item${item.bold ? ' bold' : ''}${item.wrap ? ' wrap' : ''}${isOpen ? ' open' : ''}`}
               disabled={item.disabled}
+              aria-keyshortcuts={item.keys || undefined}
               onClick={() => {
                 if (submenu) {
                   setOpen(isOpen && mobile ? null : index);
@@ -48,6 +51,11 @@ const MenuList = ({ items, mobile }: { items: MenuEntry[]; mobile: boolean }) =>
             >
               <span className="menu-icon">{item.checked ? <Check size={14} /> : item.icon}</span>
               <span className="menu-label">{item.label}</span>
+              {item.keys && !mobile && (
+                <span className="menu-keys" aria-hidden="true">
+                  {combinationLabel(item.keys, isMac)}
+                </span>
+              )}
               {submenu && (mobile && isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
             </button>
             {submenu && isOpen && !item.disabled && (

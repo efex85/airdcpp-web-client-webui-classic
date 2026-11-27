@@ -1479,6 +1479,17 @@ textarea[aria-invalid='true'] {
   white-space: normal;
 }
 
+.menu-keys {
+  flex: none;
+  margin-left: 16px;
+  color: var(--muted);
+  font-size: 0.92em;
+}
+
+.menu-item:hover:not(:disabled) .menu-keys {
+  color: inherit;
+}
+
 .menu-heading {
   padding: 2px 8px 2px 24px;
   overflow: hidden;
@@ -2374,6 +2385,19 @@ textarea.notes {
   gap: 7px;
   padding: 7px 10px 9px;
   container-type: inline-size;
+  /* The information can be marked and copied */
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.home-stats button {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* IPv6 addresses are long */
+.stat-address {
+  overflow-wrap: anywhere;
 }
 
 /* The names stay on one row where there is room for that (counted in text widths, so it follows the text size) */
@@ -2383,7 +2407,7 @@ textarea.notes {
   }
 }
 
-/* A line between the groups: uptime, transfers, share, hashing, disks */
+/* A line between the groups: uptime, transfers, connection and share, disks, hashing */
 .home-stats > * + * {
   padding-top: 7px;
   border-top: 1px solid var(--border);
@@ -3118,6 +3142,59 @@ textarea.notes {
 @media (hover: none) {
   .menu-item:hover:not(:disabled):not(.open) {
     background: transparent;
+  }
+}
+
+
+/* Shortcuts */
+
+.shortcuts {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 680px;
+  container-type: inline-size;
+}
+
+.shortcut {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(150px, 200px) auto minmax(130px, auto) auto;
+  align-items: center;
+  gap: 4px 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--row-border);
+}
+
+.shortcut-keys {
+  justify-content: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.shortcut-keys.unset {
+  color: var(--muted);
+}
+
+.shortcut-keys.recording {
+  border-color: var(--accent);
+  color: inherit;
+}
+
+.shortcut-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--accent);
+  line-height: 1.4;
+}
+
+@container (max-width: 600px) {
+  .shortcut {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  }
+
+  .shortcut-name {
+    grid-column: 1 / -1;
   }
 }
 

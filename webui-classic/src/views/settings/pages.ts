@@ -21,6 +21,7 @@ import {
 import { EmojiPage } from './pages/emoji';
 import { CatalogPage, ExtensionEnginesPage, ExtensionOptionsPage, ExtensionsPage } from './pages/extensions';
 import { ColorsPage, StartupPage, TextPage } from './pages/personal';
+import { ShortcutsPage } from './pages/shortcuts';
 import { TabsPage } from './pages/tabs';
 import { AwayPage, IgnoredUsersPage, MiscPage, UserPage } from './pages/profile';
 import {
@@ -131,6 +132,7 @@ export const PAGE_GROUPS: PageGroup[] = [
       ['tabs', 'Tab highlights', TabsPage, null],
       ['text', 'Text and chat', TextPage, null],
       ['emoji', 'Emoji', EmojiPage, null],
+      ['shortcuts', 'Shortcuts', ShortcutsPage, null],
       ['notifications', 'Notifications', NotificationsPage, null],
       ['histories', 'Histories', HistoriesPage],
       ['events', 'Events', EventsPage],

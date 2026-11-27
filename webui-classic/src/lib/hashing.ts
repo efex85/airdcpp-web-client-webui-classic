@@ -1,4 +1,4 @@
-// What the System stats widget says about hashing
+// What the System information widget says about hashing
 import type { HashStats } from '../api/settingsTypes';
 import { formatDuration, formatSize, formatSpeed } from './format';
 

@@ -10,6 +10,8 @@ export type MenuEntry =
       onClick?: () => void;
       disabled?: boolean;
       checked?: boolean;
+      /** The keyboard shortcut that does the same, e.g. "Alt+N" */
+      keys?: string;
       /** The default action (same as double-click) */
       bold?: boolean;
       children?: MenuEntry[];

@@ -1,10 +1,11 @@
-// Free disk space in the System stats widget
+// Free disk space in the System information widget
 import { useEffect, useState } from 'react';
 import type { ShareRoot } from '../../api/settingsTypes';
 import { Progress } from '../../components/Progress';
 import { useAccess } from '../../lib/access';
 import { diskFolderNames, diskIsLow, diskUsedPercent, groupDisks, type Disk, type DiskInfo } from '../../lib/disks';
 import { formatSize } from '../../lib/format';
+import { useHeld } from '../../lib/useSelecting';
 import { useApp } from '../../store/app';
 import { socket } from '../../store/session';
 
@@ -31,11 +32,12 @@ const loadDisks = async (shares: boolean): Promise<Disk[]> => {
   return groupDisks(folders, infos);
 };
 
-export const DiskStats = ({ active }: { active: boolean }) => {
+export const DiskStats = ({ active, held }: { active: boolean; held: boolean }) => {
   const access = useAccess();
   const shares = access('share_view');
   const generation = useApp((s) => s.generation);
-  const [disks, setDisks] = useState<Disk[]>([]);
+  const [loaded, setDisks] = useState<Disk[]>([]);
+  const disks = useHeld(loaded, held);
 
   useEffect(() => {
     if (!active) {
