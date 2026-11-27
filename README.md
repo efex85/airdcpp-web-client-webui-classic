@@ -1,6 +1,4 @@
-# AirDC++ Web Client WebUI-Classic
-
-Prebuilt image available at https://hub.docker.com/r/rafsis/airdcpp-web-client-webui-classic
+# AirDC++ Web Client mod-xl
 
 A Debian based Docker image of AirDC++ Web Client with:
 
@@ -9,8 +7,10 @@ A Debian based Docker image of AirDC++ Web Client with:
 2. **Hub user commands** in the hub and user-list menus (what the Windows client shows when you
    right-click a hub or a user) – `daemon-hubcommands.patch`
 3. **System uptime** on the Home page of the web UI – `daemon-system-uptime.patch`
-4. **Syncing between devices** of the Home widgets, notes, colors and startup choices of the web UI –
+4. **Syncing between devices** of the Home widgets, notes, colors, emoji and startup choices of the web UI –
    `daemon-user-data.patch`
+5. **Emoticon packs** for the chats of the web UI, read from the configuration directory –
+   `daemon-emoticon-packs.patch`
 
 ## The web UI
 
@@ -18,7 +18,10 @@ A Debian based Docker image of AirDC++ Web Client with:
   menus. Dark theme, with a layout of its own for phones.
 - Hubs, private messages, search, file lists, download queue, transfers, favorite hubs, system log, and viewing
   text, NFO, image, audio and video files.
-- A **Home** window with system statistics, RSS feeds and notes. It can be turned off.
+- **Emoji** in chats: text smileys shown as emoji or as the pictures of an emoticon pack, and a button for
+  inserting them. It can be turned off.
+- A **Home** window with system statistics (including hashing and disk space), RSS feeds, notes, recent private
+  chats and recent searches. It can be turned off.
 - Tabs can be rearranged by dragging them with a mouse or pen. Closing a window returns to the previous one.
 - Your own colors and color sets, tab highlights per event, text sizes, chat font and timestamps.
 - The toolbar refreshes the whole share, the incoming folders or a single shared folder.
@@ -110,7 +113,7 @@ Settings, web users and the synced data of the web UI are kept in the configurat
 
 ## What is different from the plain build
 
-Hub user commands, system uptime and syncing are **daemon** changes (C++). For the commands, the web UI asks the
+Hub user commands, system uptime, syncing and emoticon packs are **daemon** changes (C++). For the commands, the web UI asks the
 daemon for the `hub` and `hub_user` menus, so they show up in its menus.
 These changes mean the image **cannot use the official release tarball**: the Dockerfile builds the daemon from
 source with the patches applied, and assembles the same layout as the official portable package
@@ -151,6 +154,30 @@ The daemon API has nowhere to keep data of a web UI, so `daemon-user-data.patch`
   as long as that directory is kept. Include it in your backups. It is **not encrypted**.
 - Limits: keys of letters, digits and `_` (at most 64), 256 KiB and 32 levels per value, 200 keys per user.
 
+## Emoticon packs
+
+The web UI shows text smileys with the emoji of the device. To use pictures instead, put emoticon packs into the
+folder `EmoPacks` of the configuration directory: `./config/EmoPacks` with the example `docker-compose.yml`
+(`/.airdcpp/EmoPacks` in the container, which creates the folder when it starts). A pack is laid out like those of
+the Windows client:
+
+```
+config/EmoPacks/
+  Name.xml        <- lists the text codes and their pictures
+  Name/           <- the pictures that the file lists
+    ...
+```
+
+No pack comes with the image. The contents of the `EmoPacks` folder of a Windows installation can be copied as they
+are. Then choose the pack under **Settings → View → Emoji** (press **Reload** if the page was open).
+
+- The files must be readable and writable for the user that the client runs as. A container that is started as root
+  takes care of that when it starts; one started with `--user` refuses to start if a file in the configuration
+  directory isn't.
+- `daemon-emoticon-packs.patch` makes the web server answer `/emopacks` (the names of the packs) and
+  `/emopacks/<path>` (`.xml`, `.bmp`, `.gif`, `.png`, `.jpg`, `.jpeg` and `.webp` files of that folder), only to
+  logged-in users. As on Windows, the case of file names doesn't matter.
+
 ## How the hub commands behave
 
 - Commands come from hubs (sent by the hub) and from the user's own saved commands, filtered for the hub
@@ -170,17 +197,18 @@ The daemon API has nowhere to keep data of a web UI, so `daemon-user-data.patch`
 
 ## Files
 
-| File                          | Purpose                                                                |
-|-------------------------------|------------------------------------------------------------------------|
-| `Dockerfile`                  | web UI build → daemon build → runtime image                            |
-| `webui-classic/`              | source of the web UI                                                   |
-| `daemon-hubcommands.patch`    | daemon change: hub user commands (new `HubCommandMenuProvider`)        |
-| `daemon-system-uptime.patch`  | daemon change: `system_started` in the system information              |
-| `daemon-user-data.patch`      | daemon change: small per-user data store for the web UI                |
-| `list-runtime-deps.sh`        | finds the runtime library packages during the build                    |
-| `entrypoint.sh`, `.airdcpp/`  | container entrypoint and default config                                |
-| `build.sh`                    | builds the image, without cache; uploads nothing                       |
-| `daemon-extension-sha1.patch` | optional daemon fix, not applied by the Dockerfile (see below)         |
+| File                          | Purpose                                                                 |
+|-------------------------------|-------------------------------------------------------------------------|
+| `Dockerfile`                  | web UI build → daemon build → runtime image                             |
+| `webui-classic/`              | source of the web UI                                                    |
+| `daemon-hubcommands.patch`    | daemon change: hub user commands (new `HubCommandMenuProvider`)         |
+| `daemon-system-uptime.patch`  | daemon change: `system_started` in the system information               |
+| `daemon-user-data.patch`      | daemon change: small per-user data store for the web UI                 |
+| `daemon-emoticon-packs.patch` | daemon change: serves the emoticon packs of the configuration directory |
+| `list-runtime-deps.sh`        | finds the runtime library packages during the build                     |
+| `entrypoint.sh`, `.airdcpp/`  | container entrypoint and default config                                 |
+| `build.sh`                    | builds the image, without cache; uploads nothing                        |
+| `daemon-extension-sha1.patch` | optional daemon fix, not applied by the Dockerfile (see below)          |
 
 ### The optional extension fix
 

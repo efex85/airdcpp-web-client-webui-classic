@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react';
 import {
   createWidget,
+  isSingleWidget,
   MAX_WIDGETS,
   moveWidget,
   newWidgetId,
@@ -86,10 +87,10 @@ const addWidget = async (type: WidgetType) => {
   );
 };
 
-/** Every kind of widget; there is only one with statistics */
+/** Every kind of widget; of some there is only one */
 export const addWidgetMenu = (icon: (type: WidgetType) => ReactNode): MenuEntry[] =>
   (Object.keys(WIDGET_NAMES) as WidgetType[]).map((type) => {
-    const added = type === 'stats' && list().some((w) => w.type === 'stats');
+    const added = isSingleWidget(type) && list().some((w) => w.type === type);
     return {
       label: added ? `${WIDGET_NAMES[type]} (already added)` : WIDGET_NAMES[type],
       icon: icon(type),

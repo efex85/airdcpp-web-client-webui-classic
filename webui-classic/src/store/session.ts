@@ -34,6 +34,7 @@ import {
   colorsDoc,
   connectDocs,
   disconnectDocs,
+  emojiDoc,
   flushDocs,
   isConnected,
   remoteChange,
@@ -41,6 +42,7 @@ import {
   syncAll,
 } from './docs';
 import { showUserColors } from './theme';
+import { resetEmoji } from './emoji';
 import { LiveList } from './live';
 import { syncNotifications } from './notifications';
 import { requestPermission } from '../lib/browserNotification';
@@ -317,12 +319,13 @@ const onAuthenticated = async (response: LoginResponse) => {
   const current = attempt;
   const login = { ...useApp.getState().login, ...response } as LoginResponse;
   connectUserData(login);
-  await patience(Promise.all([startupDoc.sync(), colorsDoc.sync()]));
+  await patience(Promise.all([startupDoc.sync(), colorsDoc.sync(), emojiDoc.sync()]));
   if (current !== attempt) {
     return;
   }
 
   showUserColors();
+  resetEmoji(); // Packs may have been changed
   startSession(startupDoc.value);
   useApp.setState({ connection: 'connected', login, loginError: null, resuming: false });
   startTimers();
@@ -335,6 +338,7 @@ const showLogin = (error: string | null) => {
   save('auth', null, 'session');
   useApp.setState({ connection: 'login', loginError: error, login: null, resuming: false });
   disconnectDocs();
+  resetEmoji();
 };
 
 export const login = async (username: string, password: string, remember: boolean) => {

@@ -1,13 +1,15 @@
-// Message text with the links, magnets and highlights reported by the daemon
+// Message text with the links, magnets and highlights reported by the daemon, and emoji
 import { Magnet as MagnetIcon } from 'lucide-react';
 import { copyText, connectHub, openSearch } from '../actions';
 import { downloadMenu, fileDownload } from '../actions/download';
 import { viewEntries } from '../actions/view';
 import type { Dupe, Highlight, HintedUser } from '../api/types';
 import { dupeClass } from '../lib/dupe';
+import { MAX_PER_MESSAGE, splitEmoticons, type EmoticonMatcher } from '../lib/emoji';
 import { formatSize } from '../lib/format';
 import { isHubLink, isSafeLink, parseMagnet, splitHighlights, type Magnet } from '../lib/highlight';
 import { openMenu, type MenuPosition } from '../store/ui';
+import { EmojiView } from './Emoji';
 
 const magnetMenu = (
   position: MenuPosition,
@@ -104,18 +106,38 @@ export const MessageText = ({
   text,
   highlights,
   sender,
+  emoji,
 }: {
   text: string;
   highlights: Highlight[];
   sender?: HintedUser;
-}) => (
-  <>
-    {splitHighlights(text, highlights ?? []).map((part, i) =>
-      part.highlight ? (
-        <Part key={i} text={part.text} highlight={part.highlight} sender={sender} />
-      ) : (
-        part.text
-      ),
-    )}
-  </>
-);
+  /** Shows text codes as emoji; only outside of links and other highlights */
+  emoji?: EmoticonMatcher;
+}) => {
+  const parts = splitHighlights(text, highlights ?? []);
+  let left = MAX_PER_MESSAGE;
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.highlight) {
+          return <Part key={i} text={part.text} highlight={part.highlight} sender={sender} />;
+        }
+
+        if (!emoji) {
+          return part.text;
+        }
+
+        const before = parts[i - 1]?.text.slice(-1) ?? '';
+        const after = parts[i + 1]?.text[0] ?? '';
+        return splitEmoticons(part.text, emoji, before, after, left).map((piece, j) => {
+          if (typeof piece === 'string') {
+            return piece;
+          }
+
+          left--;
+          return <EmojiView key={`${i}-${j}`} emoticon={piece} />;
+        });
+      })}
+    </>
+  );
+};

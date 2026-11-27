@@ -14,9 +14,10 @@ COPY webui-classic/ ./
 RUN npm run build
 
 # --- Stage 2: build the daemon from source with the patches of this repository applied ---
-# daemon-hubcommands.patch (hub user commands), daemon-system-uptime.patch (system uptime for the Home page) and
-# daemon-user-data.patch (syncing web UI data between devices) were made against this exact upstream commit
-# (2.14.1b-91) and are applied in this order.
+# daemon-hubcommands.patch (hub user commands), daemon-system-uptime.patch (system uptime for the Home page),
+# daemon-user-data.patch (syncing web UI data between devices) and daemon-emoticon-packs.patch (emoticon packs from
+# the configuration directory) were made against this exact upstream commit (2.14.1b-91) and are applied in this
+# order.
 FROM debian:${distro} AS daemon-build
 ARG daemon_repo="https://github.com/airdcpp-web/airdcpp-webclient.git"
 ARG daemon_ref="e330cf88efaeea67768630b5c888dfd989563cdc"
@@ -41,6 +42,8 @@ COPY daemon-system-uptime.patch /tmp/daemon-system-uptime.patch
 RUN git apply --check /tmp/daemon-system-uptime.patch && git apply /tmp/daemon-system-uptime.patch
 COPY daemon-user-data.patch /tmp/daemon-user-data.patch
 RUN git apply --check /tmp/daemon-user-data.patch && git apply /tmp/daemon-user-data.patch
+COPY daemon-emoticon-packs.patch /tmp/daemon-emoticon-packs.patch
+RUN git apply --check /tmp/daemon-emoticon-packs.patch && git apply /tmp/daemon-emoticon-packs.patch
 
 # The version string normally ends with the suffix that git adds to a modified tree ("-d", e.g. 2.14.1b-91-ge330-d).
 # It is removed by default (empty), giving e.g. 2.14.1b-91-ge330. To add one, use --build-arg version_suffix=-xl

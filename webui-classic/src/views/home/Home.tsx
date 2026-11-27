@@ -1,15 +1,38 @@
-// The Home window: statistics, feeds and notes
-import { Activity, EllipsisVertical, Plus, Rss, StickyNote, X } from 'lucide-react';
+// The Home window: statistics, feeds, notes and recent chats and searches
+import { Activity, EllipsisVertical, History, MessagesSquare, Plus, Rss, StickyNote, X } from 'lucide-react';
 import { WIDGET_NAMES, type Widget, type WidgetType } from '../../lib/widgets';
 import { useDoc, useDocStatus, widgetsDoc } from '../../store/docs';
 import { useFeeds } from '../../store/feeds';
 import { openMenu } from '../../store/ui';
 import { NotesWidget } from './NotesWidget';
+import { RecentPmsWidget } from './RecentPmsWidget';
+import { RecentSearchesWidget } from './RecentSearchesWidget';
 import { RssWidget } from './RssWidget';
 import { StatsWidget } from './StatsWidget';
 import { addWidgetMenu, askRemoveWidget, updateWidget, widgetMenu } from './widgetActions';
 
-const ICONS: Record<WidgetType, typeof Rss> = { stats: Activity, rss: Rss, notes: StickyNote };
+const ICONS: Record<WidgetType, typeof Rss> = {
+  stats: Activity,
+  rss: Rss,
+  notes: StickyNote,
+  pms: MessagesSquare,
+  searches: History,
+};
+
+const Content = ({ widget, title, active }: { widget: Widget; title: string; active: boolean }) => {
+  switch (widget.type) {
+    case 'stats':
+      return <StatsWidget active={active} />;
+    case 'rss':
+      return <RssWidget widget={widget} active={active} onAddress={(url) => updateWidget(widget.id, { url })} />;
+    case 'notes':
+      return <NotesWidget id={widget.id} title={title} />;
+    case 'pms':
+      return <RecentPmsWidget active={active} />;
+    case 'searches':
+      return <RecentSearchesWidget active={active} />;
+  }
+};
 
 const widgetIcon = (type: WidgetType) => {
   const Icon = ICONS[type];
@@ -49,13 +72,7 @@ const Card = ({ widget, active }: { widget: Widget; active: boolean }) => {
           <X size={14} />
         </button>
       </header>
-      {widget.type === 'stats' ? (
-        <StatsWidget active={active} />
-      ) : widget.type === 'rss' ? (
-        <RssWidget widget={widget} active={active} onAddress={(url) => updateWidget(widget.id, { url })} />
-      ) : (
-        <NotesWidget id={widget.id} title={title} />
-      )}
+      <Content widget={widget} title={title} active={active} />
     </section>
   );
 };

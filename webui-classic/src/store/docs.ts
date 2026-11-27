@@ -1,6 +1,7 @@
 // The data of this UI that is the same on all devices of a user
 
 import { useSyncExternalStore } from 'react';
+import { EMOJI_DEFAULTS, sanitizeEmoji, type EmojiSettings } from '../lib/emoji';
 import { merge, mergeText } from '../lib/merge';
 import { sanitizeStartup, STARTUP_DEFAULTS, type StartupSettings } from '../lib/startup';
 import { SyncedDoc, type Cache, type SyncStatus, type Transport } from '../lib/syncedDoc';
@@ -29,6 +30,13 @@ export const widgetsDoc = new SyncedDoc<HomeWidgets>({
   merge,
 });
 
+export const emojiDoc = new SyncedDoc<EmojiSettings>({
+  key: 'classic_emoji',
+  defaults: EMOJI_DEFAULTS,
+  sanitize: sanitizeEmoji,
+  merge,
+});
+
 const noteDocs = new Map<string, SyncedDoc<string>>();
 
 interface Connection {
@@ -39,7 +47,7 @@ interface Connection {
 let connection: Connection | null = null;
 let errorHandler: ((error: Error) => void) | null = null;
 
-const fixed = [startupDoc, colorsDoc, widgetsDoc] as SyncedDoc<any>[];
+const fixed = [startupDoc, colorsDoc, widgetsDoc, emojiDoc] as SyncedDoc<any>[];
 const allDocs = (): SyncedDoc<any>[] => [...fixed, ...noteDocs.values()];
 
 /** The text of a notes widget */
@@ -79,7 +87,7 @@ export const syncAll = async () => {
     return;
   }
 
-  await Promise.all([startupDoc.sync(), colorsDoc.sync()]);
+  await Promise.all([startupDoc.sync(), colorsDoc.sync(), emojiDoc.sync()]);
   // The widgets first, so that the text of removed notes isn't restored
   await widgetsDoc.sync();
   await syncNotes();

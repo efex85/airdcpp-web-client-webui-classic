@@ -3,6 +3,7 @@ import {
   memo,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -14,13 +15,16 @@ import { copyText, userMenu } from '../actions';
 import { remoteMenu } from '../actions/menus';
 import type { MessageWrapper, OnlineUser } from '../api/types';
 import { completeNick, messageRequests, parseCommand, type Completion } from '../lib/chat';
+import { insertEmoji, type EmoticonMatcher } from '../lib/emoji';
 import { Time } from './Time';
 import { nickClass, toHinted } from '../lib/user';
 import { useFollowBottom } from '../lib/useFollowBottom';
 import { useIsMobile } from '../lib/useIsMobile';
 import { reportError, toast, useApp } from '../store/app';
+import { useEmoji } from '../store/emoji';
 import { socket } from '../store/session';
 import { openMenu, type MenuEntry, type MenuPosition } from '../store/ui';
+import { EmojiPicker } from './Emoji';
 import { MessageText } from './MessageText';
 
 const HELP = [
@@ -76,7 +80,14 @@ const Nick = ({ user, hubId, insert, children }: NickProps) => {
   );
 };
 
-const Line = memo(({ message, hubId, insert }: { message: MessageWrapper; hubId?: number; insert: (nick: string) => void }) => {
+interface LineProps {
+  message: MessageWrapper;
+  hubId?: number;
+  insert: (nick: string) => void;
+  emoji?: EmoticonMatcher;
+}
+
+const Line = memo(({ message, hubId, insert, emoji }: LineProps) => {
   const chat = message.chat_message;
   if (chat) {
     const nick = (
@@ -89,7 +100,7 @@ const Line = memo(({ message, hubId, insert }: { message: MessageWrapper; hubId?
       <div className={`line${chat.has_mention ? ' mentioned' : ''}`}>
         <Time value={chat.time} />
         {chat.third_person ? <>* {nick} </> : <>&lt;{nick}&gt; </>}
-        <MessageText text={chat.text} highlights={chat.highlights} sender={toHinted(chat.from)} />
+        <MessageText text={chat.text} highlights={chat.highlights} sender={toHinted(chat.from)} emoji={emoji} />
       </div>
     );
   }
@@ -118,7 +129,10 @@ interface Props {
 export const ChatView = ({ sessionKey, path, messages, hubId, nicks, disabled, active }: Props) => {
   const mobile = useIsMobile();
   const [text, setText] = useState('');
-  const log = useFollowBottom<HTMLDivElement>(messages);
+  const emoji = useEmoji();
+  const matcher = emoji.active?.matcher;
+  // Emoji can change the height of lines
+  const log = useFollowBottom<HTMLDivElement>(useMemo(() => [messages, matcher], [messages, matcher]));
   const input = useRef<HTMLTextAreaElement>(null);
   const completion = useRef<Completion['next'] | null>(null);
   const history = useRef<{ entries: string[]; index: number; draft: string }>({ entries: [], index: -1, draft: '' });
@@ -184,6 +198,18 @@ export const ChatView = ({ sessionKey, path, messages, hubId, nicks, disabled, a
     }
   };
 
+  const addEmoji = (code: string) => {
+    const el = input.current!;
+    const result = insertEmoji(text, code, el.selectionStart, el.selectionEnd);
+    completion.current = null;
+    setText(result.text);
+    // Not on phones: the on-screen keyboard would open
+    if (!mobile) {
+      caret.current = result.caret;
+      el.focus({ preventScroll: true });
+    }
+  };
+
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     const el = e.currentTarget;
     if (e.key !== 'Tab' && e.key !== 'Shift') {
@@ -239,7 +265,13 @@ export const ChatView = ({ sessionKey, path, messages, hubId, nicks, disabled, a
       >
         {!messages?.length && <div className="line status">No messages</div>}
         {messages?.map((m) => (
-          <Line key={(m.chat_message ?? m.log_message)!.id} message={m} hubId={hubId} insert={insert} />
+          <Line
+            key={(m.chat_message ?? m.log_message)!.id}
+            message={m}
+            hubId={hubId}
+            insert={insert}
+            emoji={matcher}
+          />
         ))}
       </div>
       <form
@@ -262,6 +294,9 @@ export const ChatView = ({ sessionKey, path, messages, hubId, nicks, disabled, a
           }}
           onKeyDown={onKeyDown}
         />
+        {emoji.enabled && (
+          <EmojiPicker active={emoji.active} disabled={disabled} shown={active} onPick={addEmoji} />
+        )}
         <button type="submit" disabled={disabled || !text.trim()} aria-label="Send" title="Send">
           <Send size={14} />
         </button>

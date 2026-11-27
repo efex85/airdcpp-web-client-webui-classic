@@ -2,8 +2,9 @@
 
 The web UI of this image: a UI for [AirDC++ Web Client](https://airdcpp-web.github.io/) that looks and works like a
 classic desktop DC client: menu bar, toolbar, window tabs at the bottom, sortable lists with right-click menus, a transfer
-pane and a status bar. Dark theme. It talks to the daemon through its Web API; the system uptime and the syncing
-between devices need two small daemon patches of this image (see the [main README](../README.md)).
+pane and a status bar. Dark theme. It talks to the daemon through its Web API; the system uptime, the syncing
+between devices and the emoticon packs need three small daemon patches of this image (see the
+[main README](../README.md)).
 
 ## What is included
 
@@ -58,26 +59,55 @@ changed, depends on the permissions of the web user.
 
 ## Home
 
-- **System stats**: system and client uptime, current speeds and running transfers, downloaded and uploaded
-  this session and in total, share ratio, download queue, share size and connected hubs. Inside Docker the system
-  uptime is normally that of the host machine.
+- **System stats**, from top to bottom: system and client uptime; current speeds, running transfers, downloaded
+  and uploaded this session and in total, the ratio (ul/dl) and the download queue; connected hubs and share size;
+  hashing; disk space. Inside Docker the system uptime is normally that of the host machine.
 - **RSS feed**: add as many as you like. Each has its own address, title and refresh interval, and a refresh
   button. Click an entry to open its link or to search for its title; the search starts at once. The client
   fetches the feeds, as in the official web UI.
 - **Notes**: saved while typing, at most 60,000 characters each.
+- **Recent PMs**: the private chats that were opened last, newest first, with the hub (or *Offline*) and the time
+  they were opened. Chats that are open now are marked *Open*. Click one to show it or to open it again.
+- **Recent searches**: the words you searched for last, newest first. Click one to search for it again, with the
+  default search options.
 
-**+ Add widget** at the top lists the available widgets; there is only one with system statistics. **⋮** on a
-widget changes or moves it, and **×** removes it.
+**+ Add widget** at the top lists the available widgets; of System stats, Recent PMs and Recent searches there is
+only one each. **⋮** on a widget changes or moves it, and **×** removes it.
 
-**Height**: feeds and notes can be made taller under **⋮ → Height**: Normal, Tall (2 boxes) or Extra tall
+All boxes are equally high. When System stats needs more room than usual (large text, several disks), the other
+boxes grow with it.
+
+**Height**: all widgets except System stats can be made taller under **⋮ → Height**: Normal, Tall (2 boxes) or Extra tall
 (3 boxes). The boxes are placed from left to right, row by row, and a tall box also occupies the place below it.
 With room for three columns, the order *A, B (tall), C, D, E* gives A and D stacked on the left, B in the middle
 and C and E stacked on the right. Use **Move earlier** and **Move later** to change the order. The number of
 columns depends on the width of the window; a phone shows one.
 
-On a **phone** the boxes size themselves: each is as high as its content, at most the normal height, and longer
-feeds and notes scroll inside their box. The heights chosen under **⋮ → Height** only apply to larger screens. They
+On a **phone** the boxes size themselves: each is as high as its content, at most the normal height (System
+stats as high as it needs), and longer feeds, notes and lists scroll inside their box. The heights chosen under **⋮ → Height** only apply to larger screens. They
 are kept when you use a phone, and can also be changed there.
+
+### Hashing and disk space
+
+**Hashing** shows the speed and the time left, the files and the amount of data left, and how far the client has
+come with what is queued. **Pause** takes effect when the current file is done; **Resume** continues. The client
+also pauses hashing by itself while it refreshes the share. **Stop** asks first and then empties the hashing queue;
+a later share refresh adds the files again. The section needs the permission to view the share, and the buttons the
+permission to edit it.
+
+**Disk space** shows the free and total space for the download folder and the shared folders (the latter with the
+permission to view the share). The bar turns red when less than a tenth is free. The client doesn't tell which disk
+a folder is on, so folders that report the same size and free space share a line; hover over it to see their paths.
+In Docker, folders on one disk of the host therefore normally appear together. A folder that is missing shows the
+numbers of the disk where its path would be.
+
+### Recent PMs and searches
+
+Both lists are kept by the client, so they are the same on all devices, and also for all web users of the client.
+The client keeps 15 private chats and 10 searches unless you change that under **Settings → View → Histories** (a
+lowered number of searches fully applies after a restart of the client).
+Searches are saved by this web UI from this version on, including searches started from a feed entry; searches for
+a file hash aren't saved.
 
 ## Searching
 
@@ -123,12 +153,34 @@ background color, text color and bold text. On a phone the entry in the list of 
 - The system log, file lists and viewed files use the colors of "My nick is mentioned" and "Someone writes".
 - Notifications are not affected. They are set under **Settings → View → Notifications**.
 
+## Emoji
+
+Under **Settings → View → Emoji**:
+
+- **Show emoji in chats** (on by default). Text codes such as `:)` `;-)` `:D` `:P` `<3` in hub and private chats are
+  shown as emoji, and a button next to the message box offers emoji to insert. Switched off, chats show the text as
+  it is and there is no button. Only the display changes: messages are sent and stored as written.
+- **Emoji set**: the emoji of your device, or an emoticon pack of the client
+  ([how to add packs](../README.md#emoticon-packs)). With a pack, its codes and pictures replace the device's.
+  If a pack can't be read, the emoji of the device are shown and the page says why.
+
+How codes are recognized:
+
+- A code must stand on its own: after a space or another emoji, and followed by a space, punctuation, another emoji
+  or the end. Links, magnets and other highlighted text, status messages and logs are never changed.
+- At most 48 emoji are shown per message.
+- Copying chat text gives the codes of pack pictures. With the emoji of your device it gives the emoji.
+
+The button writes the text code where there is one, so that others can read it in any client. Other emoji are
+written as the character itself. On NMDC hubs such characters get lost unless the hub's character set is UTF-8
+(by default it is CP1252); ADC hubs transfer them.
+
 ## Synced and per browser
 
 | Same on all devices of a web user                      | Stored in each browser                                                |
 |--------------------------------------------------------|-----------------------------------------------------------------------|
 | Home widgets, feeds and notes                          | text sizes, chat font, timestamps                                     |
-| colors and tab highlights                              | notifications and the other browser settings                          |
+| colors, tab highlights and emoji                       | notifications and the other browser settings                          |
 | "Show the Home tab", "Open the system log …"           | tab order, column widths, pane sizes, whether the transfer pane shows |
 
 Synced data is stored by the client in `WebUserData.json` in its configuration directory. It isn't encrypted.

@@ -873,6 +873,10 @@ textarea[aria-invalid='true'] {
   background: #2e6e3c;
 }
 
+.progress.low .progress-fill {
+  background: #8a2f2f;
+}
+
 .progress-text {
   position: relative;
   display: block;
@@ -1072,8 +1076,81 @@ textarea[aria-invalid='true'] {
 
 .chat-input textarea {
   flex: 1;
+  min-width: 0;
   resize: none;
   line-height: 1.4;
+}
+
+/* Emoji */
+
+.emoticon {
+  width: calc(var(--w) * 1px * var(--font-scale) * var(--chat-scale));
+  height: calc(var(--h) * 1px * var(--font-scale) * var(--chat-scale));
+  max-width: 120px;
+  max-height: 80px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+.chat-input {
+  position: relative;
+}
+
+.emoji-picker {
+  display: flex;
+}
+
+.emoji-panel {
+  position: absolute;
+  right: 4px;
+  bottom: calc(100% + 2px);
+  z-index: 20;
+  width: min(calc(330px * var(--font-scale)), calc(100% - 8px));
+  max-height: min(calc(300px * var(--font-scale)), 45vh);
+  max-height: min(calc(300px * var(--font-scale)), 45dvh);
+  padding: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--chrome);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 50%);
+}
+
+.emoji-group h3 {
+  margin: 4px 2px 2px;
+  color: var(--muted);
+  font-size: calc(11px * var(--font-scale));
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(34px * var(--font-scale)), 1fr));
+  gap: 1px;
+}
+
+.emoji-grid button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: calc(32px * var(--font-scale));
+  padding: 2px;
+  overflow: hidden;
+  background: none;
+  border: 1px solid transparent;
+  font-size: calc(18px * var(--font-scale));
+}
+
+.emoji-grid button:hover,
+.emoji-grid button:focus-visible {
+  border-color: var(--border);
+  background: var(--chrome-hover);
+}
+
+.emoji-grid .emoticon {
+  width: calc(var(--w) * 1px * var(--font-scale));
+  height: calc(var(--h) * 1px * var(--font-scale));
+  max-width: 100%;
 }
 
 /* Hub */
@@ -1974,8 +2051,9 @@ fieldset.field {
 .home-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
-  /* The boxes of a row are equally high. A row only grows if the statistics need more room. */
-  grid-auto-rows: minmax(calc(340px * var(--font-scale)), max-content);
+  /* All boxes of one size are equally high: the normal height, or more if the statistics need more room.
+     (In a grid without a fixed height, 1fr makes every row as high as the highest one needs.) */
+  grid-auto-rows: minmax(calc(340px * var(--font-scale)), 1fr);
   gap: 8px;
   padding: 8px;
 }
@@ -1993,9 +2071,8 @@ fieldset.field {
   border: 1px solid var(--border-strong);
 }
 
-/* Long feeds and notes scroll instead of making their row higher */
-.widget-rss,
-.widget-notes {
+/* Long feeds, notes and lists scroll instead of making their row higher */
+.widget:not(.widget-stats) {
   contain: size;
 }
 
@@ -2033,6 +2110,14 @@ fieldset.field {
 
 .i-widget-notes {
   color: var(--yellow);
+}
+
+.i-widget-pms {
+  color: var(--green);
+}
+
+.i-widget-searches {
+  color: var(--link);
 }
 
 .widget-scroll {
@@ -2111,6 +2196,82 @@ fieldset.field {
   font-size: calc(11px * var(--font-scale));
 }
 
+.recent {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent li {
+  border-bottom: 1px solid var(--row-border);
+}
+
+.recent button {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  width: 100%;
+  padding: 3px 8px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.recent button:hover:not(:disabled) {
+  background: var(--row-hover);
+}
+
+.recent-title,
+.recent-detail {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.recent-name {
+  min-width: 0;
+  color: var(--link);
+  overflow-wrap: anywhere;
+}
+
+.recent-open {
+  flex: none;
+  color: var(--green);
+  font-size: calc(11px * var(--font-scale));
+}
+
+.recent-detail {
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: calc(11px * var(--font-scale));
+}
+
+.recent-detail > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-detail > :last-child {
+  flex: none;
+}
+
+.recent button.recent-search {
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.recent-search svg {
+  flex: none;
+  color: var(--muted);
+}
+
 .notes-box {
   display: flex;
   flex: 1;
@@ -2131,8 +2292,61 @@ textarea.notes {
 .home-stats {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: 7px;
+  padding: 7px 10px 9px;
+  container-type: inline-size;
+}
+
+/* The names stay on one row where there is room for that (counted in text widths, so it follows the text size) */
+@container (min-width: 23em) {
+  .home-stats th[scope='row'] {
+    white-space: nowrap;
+  }
+}
+
+/* A line between the groups: uptime, transfers, share, hashing, disks */
+.home-stats > * + * {
+  padding-top: 7px;
+  border-top: 1px solid var(--border);
+}
+
+.home-stats > p {
+  margin: 0;
+}
+
+.stat-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-block header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.stat-block h3 {
+  margin: 0;
+  font-size: inherit;
+}
+
+.stat-block button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.disk + .disk {
+  margin-top: 2px;
+}
+
+.disk > div {
+  overflow-wrap: anywhere;
+  color: var(--muted);
 }
 
 .home-stats table {
@@ -2153,8 +2367,14 @@ textarea.notes {
   color: var(--muted);
 }
 
+/* The same width in every table, so that the figures line up */
 .home-stats table th[scope='row'] {
-  width: 40%;
+  width: 38%;
+}
+
+/* One row. Only where even that doesn't fit (large text on a very narrow screen) it breaks between the two figures. */
+.home-stats [data-stat='ratio'] span {
+  white-space: nowrap;
 }
 
 .home-stats thead th {
@@ -2565,8 +2785,7 @@ textarea.notes {
     grid-row: auto;
   }
 
-  .widget-rss,
-  .widget-notes {
+  .widget:not(.widget-stats) {
     contain: none;
     max-height: min(calc(340px * var(--font-scale)), 70vh);
     max-height: min(calc(340px * var(--font-scale)), 70dvh);
@@ -2605,6 +2824,10 @@ textarea.notes {
   .widget .icon-button,
   .color-row .icon-button {
     min-width: 34px;
+  }
+
+  .recent button.recent-search {
+    min-height: 36px;
   }
 
   .submenu-inline {

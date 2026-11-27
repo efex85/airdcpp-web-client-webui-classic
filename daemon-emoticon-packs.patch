@@ -1,0 +1,111 @@
+diff --git a/airdcpp-webapi/web-server/FileServer.cpp b/airdcpp-webapi/web-server/FileServer.cpp
+index 5e2f9e1f..cb2adfcb 100644
+--- a/airdcpp-webapi/web-server/FileServer.cpp
++++ b/airdcpp-webapi/web-server/FileServer.cpp
+@@ -44,6 +44,74 @@
+ namespace webserver {
+ 	using namespace dcpp;
+ 
++	// Emoticon packs for web user interfaces, in the EmoPacks folder of the configuration directory.
++	// The layout is that of the packs of the Windows client: <name>.xml and the pictures that it lists.
++	static const string EMOTICON_PACKS_URL = "/emopacks";
++
++	static string getEmoticonPackDirectory() noexcept {
++		return AppUtil::getPath(AppUtil::PATH_USER_CONFIG) + "EmoPacks" + PATH_SEPARATOR_STR;
++	}
++
++	// The name of a file or folder as it is on disk; packs are often made on Windows, where the case doesn't matter
++	static string findDirectoryItem(const string& aDirectory, const string& aName, bool aIsDirectory) {
++		string match;
++		File::forEachFile(aDirectory, "*", [&](const FilesystemItem& aInfo) {
++			if (aInfo.isDirectory == aIsDirectory && (aInfo.name == aName || (match.empty() && Util::stricmp(aInfo.name, aName) == 0))) {
++				match = aInfo.name;
++			}
++		});
++
++		return match;
++	}
++
++	// The names of the packs as a JSON array
++	static string listEmoticonPacks() {
++		StringList names;
++		File::forEachFile(getEmoticonPackDirectory(), "*", [&](const FilesystemItem& aInfo) {
++			if (!aInfo.isDirectory && aInfo.name.length() > 4 && Util::stricmp(PathUtil::getFileExt(aInfo.name), string(".xml")) == 0 && Text::validateUtf8(aInfo.name)) {
++				names.push_back(aInfo.name.substr(0, aInfo.name.length() - 4));
++			}
++		});
++
++		ranges::sort(names);
++		return json(names).dump();
++	}
++
++	static string parseEmoticonPackPath(const string& aResource) {
++		string path;
++		if (!HttpUtil::unescapeUrl(aResource.substr(0, aResource.find('?')), path)) {
++			throw RequestException(http::status::bad_request, "Invalid resource path");
++		}
++
++		if (path.find("..") != string::npos || path.find('\\') != string::npos || path.find('\0') != string::npos) {
++			throw RequestException(http::status::bad_request, "Invalid resource path");
++		}
++
++		static const StringList extensions = { ".xml", ".bmp", ".gif", ".png", ".jpg", ".jpeg", ".webp" };
++		if (ranges::find(extensions, Text::toLower(PathUtil::getFileExt(path))) == extensions.end()) {
++			throw RequestException(http::status::not_found, "File not found");
++		}
++
++		auto result = getEmoticonPackDirectory();
++		for (size_t start = 0;;) {
++			const auto end = path.find('/', start);
++			const auto isDirectory = end != string::npos;
++			const auto name = path.substr(start, isDirectory ? end - start : string::npos);
++			const auto onDisk = name.empty() || name == "." ? Util::emptyString : findDirectoryItem(result, name, isDirectory);
++			if (onDisk.empty()) {
++				throw RequestException(http::status::not_found, "File not found");
++			}
++
++			result += onDisk;
++			if (!isDirectory) {
++				return result;
++			}
++
++			result += PATH_SEPARATOR_STR;
++			start = end + 1;
++		}
++	}
++
+ 	FileServer::FileServer() {
+ 	}
+ 
+@@ -238,11 +306,30 @@ namespace webserver {
+ 			return handleProxyDownload(requestUrl, output_, aDeferF);
+ 		}
+ 
++		// Emoticon packs (for logged in users)
++		const auto isEmoticonPack = requestUrl == EMOTICON_PACKS_URL || requestUrl.starts_with(EMOTICON_PACKS_URL + "/");
++		if (isEmoticonPack) {
++			if (!aSession) {
++				output_ = "Not authorized";
++				return http::status::unauthorized;
++			}
++
++			if (requestUrl == EMOTICON_PACKS_URL) {
++				output_ = listEmoticonPacks();
++				headers_.emplace_back("Content-Type", "application/json");
++				HttpUtil::addCacheControlHeader(headers_, 0);
++				return http::status::ok;
++			}
++		}
++
+ 		// File request
+ 		string filePath;
+ 		auto isViewFile = requestUrl.length() >= 6 && requestUrl.compare(0, 6, "/view/") == 0;
+ 		try {
+-			if (isViewFile) {
++			if (isEmoticonPack) {
++				filePath = parseEmoticonPackPath(requestUrl.substr(EMOTICON_PACKS_URL.length() + 1));
++				HttpUtil::addCacheControlHeader(headers_, 0);
++			} else if (isViewFile) {
+ 				filePath = parseViewFilePath(requestUrl.substr(6), headers_, aSession);
+ 			} else if (requestUrl.length() >= 6 && requestUrl.compare(0, 6, "/proxy") == 0) {
+ 				if (!aSession) {

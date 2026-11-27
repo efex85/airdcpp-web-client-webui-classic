@@ -1,7 +1,20 @@
 /** Progress bar with the status text on it, as in the transfer list of the classic clients */
-export const Progress = ({ value, text, upload, done }: { value: number; text: string; upload?: boolean; done?: boolean }) => (
+export const Progress = ({
+  value,
+  text,
+  upload,
+  done,
+  low,
+}: {
+  value: number;
+  text: string;
+  upload?: boolean;
+  done?: boolean;
+  /** Warning color, for a disk that is nearly full */
+  low?: boolean;
+}) => (
   <span
-    className={`progress${upload ? ' upload' : ''}${done ? ' done' : ''}`}
+    className={`progress${upload ? ' upload' : ''}${done ? ' done' : ''}${low ? ' low' : ''}`}
     role="progressbar"
     aria-valuenow={Math.round(value)}
     aria-valuemin={0}

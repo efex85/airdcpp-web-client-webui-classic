@@ -11,6 +11,7 @@ import { dupeClass } from '../lib/dupe';
 import { formatDate, formatSize, formatSpeed } from '../lib/format';
 import { magnetLink } from '../lib/magnet';
 import { parentPath } from '../lib/path';
+import { isRememberedSearch, SEARCH_HISTORY_PATH } from '../lib/searchHistory';
 import { emptyResultText, progressIsTimed } from '../lib/searchProgress';
 import { useIsMobile } from '../lib/useIsMobile';
 import { reportError, useApp } from '../store/app';
@@ -208,6 +209,10 @@ export const SearchView = ({ tabKey, active }: { tabKey: string; active: boolean
       excluded: excluded.split(/\s+/).filter(Boolean),
       hubUrls,
     });
+    if (isRememberedSearch(value, fileType)) {
+      // For "Recent searches" on Home; the search works without it
+      void socket.post(SEARCH_HISTORY_PATH, { string: value }).catch(() => undefined);
+    }
   };
 
   // "Search for alternates", a feed entry etc. open the window with the search already started.

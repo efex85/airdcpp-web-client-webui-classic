@@ -26,6 +26,11 @@ init_config () {
     rm -f /.airdcpp/WebServer.xml.bak
 }
 
+create_directories () {
+    # Where emoticon packs for the web UI are put; ignored if it can't be created
+    mkdir -p /.airdcpp/EmoPacks 2>/dev/null || true
+}
+
 validate_id () {
     # Check PUID/PGID values
     if [[ -z "${PUID}" || -z "${PGID}" ]]
@@ -78,6 +83,7 @@ then
     # Container is run as a normal user or with podman
     check_config_permissions
     init_config
+    create_directories
 
     # Start airdcppd
     exec /airdcpp-webclient/airdcppd "$@"
@@ -85,6 +91,7 @@ else
     # Container is run as root
     validate_id
     create_user_and_group
+    create_directories
     take_ownership
     init_config
 

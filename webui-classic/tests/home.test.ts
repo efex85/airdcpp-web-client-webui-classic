@@ -3,6 +3,10 @@ import { CONFLICT_MARKER, equal, merge, mergeText } from '../src/lib/merge';
 import { sanitizeStartup, startupTabs } from '../src/lib/startup';
 import { rememberWindow, windowAfterClose } from '../src/lib/windowHistory';
 import { createWidget, DEFAULT_WIDGETS, moveWidget, newWidgetId, sanitizeWidgets, setWidgetRows } from '../src/lib/widgets';
+import type { HashStats } from '../src/api/settingsTypes';
+import { diskFolderNames, diskIsLow, diskUsedPercent, groupDisks } from '../src/lib/disks';
+import { hashingBusy, hashingProgress, hashingStatus, hashingText } from '../src/lib/hashing';
+import { isRememberedSearch, recentSearches } from '../src/lib/searchHistory';
 import { emptyResultText, progressIsTimed, RESULT_WAIT } from '../src/lib/searchProgress';
 import { formatAge, formatChatTime, formatUptime } from '../src/lib/format';
 import { nickClass } from '../src/lib/user';
@@ -114,6 +118,12 @@ describe('widgets', () => {
     expect(widgets.list.map((w) => w.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
   });
 
+  it('keeps one list of recent private chats and one of recent searches', () => {
+    const saved = ['pms', 'pms', 'searches', 'searches'].map((type, i) => ({ id: `w${i}`, type }));
+    expect(sanitizeWidgets({ list: saved }).list.map((w) => w.id)).toEqual(['w0', 'w2']);
+    expect(setWidgetRows(sanitizeWidgets({ list: saved }).list, 'w0', 2)[0]!.rows).toBe(2);
+  });
+
   it('uses the defaults if nothing sensible is stored', () => {
     expect(sanitizeWidgets(null)).toBe(DEFAULT_WIDGETS);
   });
@@ -206,5 +216,101 @@ describe('progress of a search', () => {
     expect(emptyResultText({ phase: 'idle' }, 0)).toBe('Enter a search term');
     expect(emptyResultText({ phase: 'sending' }, 0)).toBe('Searching…');
     expect(emptyResultText({ phase: 'failed' }, 0)).toBe('The search failed');
+  });
+});
+
+describe('hashing in the statistics', () => {
+  const idle: HashStats = {
+    hash_speed: 0,
+    hash_bytes_left: 0,
+    hash_files_left: 0,
+    hash_bytes_added: 0,
+    hash_files_added: 0,
+    hashers: 0,
+    pause_forced: false,
+    max_hash_speed: 0,
+  };
+  const running = {
+    ...idle,
+    hash_speed: 1024 * 1024,
+    hash_bytes_left: 60 * 1024 * 1024,
+    hash_files_left: 3,
+    hash_bytes_added: 80 * 1024 * 1024,
+    hash_files_added: 4,
+    hashers: 1,
+  };
+
+  it('is idle without files', () => {
+    expect(hashingBusy(idle)).toBe(false);
+    expect(hashingStatus(idle)).toBe('Idle');
+    expect(hashingText(idle)).toBe('Nothing to hash');
+    expect(hashingProgress(idle)).toBe(0);
+  });
+
+  it('shows the speed, the time left and the progress', () => {
+    expect(hashingStatus(running)).toBe('1.00 MiB/s, 1:00 left');
+    expect(hashingText(running)).toBe('3 files, 60.00 MiB left');
+    expect(hashingProgress(running)).toBe(25);
+    expect(hashingText({ ...running, hash_files_left: 1 })).toBe('1 file, 60.00 MiB left');
+    expect(hashingStatus({ ...running, hash_speed: 0 })).toBe('Running');
+  });
+
+  it('says when it pauses after the current file, and when it is paused', () => {
+    expect(hashingStatus({ ...running, pause_forced: true })).toBe('Pausing after this file');
+    const paused = { ...running, hashers: 0, hash_speed: 0, pause_forced: true };
+    expect(hashingStatus(paused)).toBe('Paused');
+    expect(hashingBusy(paused)).toBe(true);
+    expect(hashingStatus({ ...idle, pause_forced: true })).toBe('Paused');
+  });
+});
+
+describe('disk space', () => {
+  const GiB = 1024 ** 3;
+  const folders = ['Download folder', 'Music', 'Films', 'Books', 'Other'].map((name, i) => ({ name, path: `/${i}/` }));
+  const info = (free: number, total: number) => ({ path: '', free_space: free, total_space: total });
+
+  it('shows folders with the same numbers on one line', () => {
+    const disks = groupDisks(folders, [
+      info(10 * GiB, 100 * GiB),
+      info(10 * GiB - 4096, 100 * GiB),
+      info(500 * GiB, 1000 * GiB),
+      info(9 * GiB, 100 * GiB),
+      info(10 * GiB, 100 * GiB),
+    ]);
+    expect(disks.map((d) => d.folders.map((f) => f.name))).toEqual([
+      ['Download folder', 'Music', 'Other'],
+      ['Films'],
+      ['Books'],
+    ]);
+  });
+
+  it('handles folders without numbers', () => {
+    const disks = groupDisks(folders.slice(0, 3), [info(-1, -1), info(0, 0)]);
+    expect(disks).toHaveLength(1);
+    expect(disks[0]).toMatchObject({ free: 0, total: 0 });
+    expect(diskUsedPercent(disks[0]!)).toBe(0);
+    expect(diskIsLow(disks[0]!)).toBe(false);
+  });
+
+  it('names the folders and warns about a full disk', () => {
+    expect(diskFolderNames(folders)).toBe('Download folder, Music, Films + 2 more');
+    expect(diskFolderNames([folders[1]!, folders[1]!])).toBe('Music');
+    expect(diskUsedPercent({ folders, free: 25, total: 100 })).toBe(75);
+    expect(diskIsLow({ folders, free: 9, total: 100 })).toBe(true);
+    expect(diskIsLow({ folders, free: 10, total: 100 })).toBe(false);
+  });
+});
+
+describe('recent searches', () => {
+  it('remembers words, not hashes', () => {
+    expect(isRememberedSearch('ubuntu iso', 'any')).toBe(true);
+    expect(isRememberedSearch('LWPNACQDBZRYXW3VHJVCJ64QBZNGHOHHHZWCLNQ', 'tth')).toBe(false);
+    expect(isRememberedSearch('  ', 'any')).toBe(false);
+  });
+
+  it('lists the newest first', () => {
+    const history = ['old', 'new'];
+    expect(recentSearches(history)).toEqual(['new', 'old']);
+    expect(history).toEqual(['old', 'new']);
   });
 });

@@ -11,6 +11,7 @@ export type Permission =
   | 'filesystem_view'
   | 'filesystem_edit'
   | 'hubs_view'
+  | 'private_chat_edit'
   | 'filelists_view'
   | 'view_file_edit'
   | 'queue_edit'

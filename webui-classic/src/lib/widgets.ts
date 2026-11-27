@@ -1,6 +1,6 @@
 // The widgets of the Home window
 
-export type WidgetType = 'stats' | 'rss' | 'notes';
+export type WidgetType = 'stats' | 'rss' | 'notes' | 'pms' | 'searches';
 
 export interface Widget {
   /** Letters and digits; also part of the name under which the text of notes is stored */
@@ -12,7 +12,7 @@ export interface Widget {
   url: string;
   /** A feed is loaded again when it's older than this (RSS widgets) */
   refresh_minutes: number;
-  /** Feeds and notes that are made taller fill this many rows of the window (missing: one) */
+  /** Widgets that are made taller fill this many rows of the window (missing: one) */
   rows?: number;
 }
 
@@ -20,7 +20,16 @@ export interface HomeWidgets {
   list: Widget[];
 }
 
-export const WIDGET_NAMES: Record<WidgetType, string> = { stats: 'System stats', rss: 'RSS feed', notes: 'Notes' };
+export const WIDGET_NAMES: Record<WidgetType, string> = {
+  stats: 'System stats',
+  rss: 'RSS feed',
+  notes: 'Notes',
+  pms: 'Recent PMs',
+  searches: 'Recent searches',
+};
+
+/** Widgets that show the same wherever they are, so there is only one of each */
+export const isSingleWidget = (type: WidgetType) => type === 'stats' || type === 'pms' || type === 'searches';
 
 export const MAX_WIDGETS = 50;
 export const MAX_NOTE_LENGTH = 60_000;
@@ -65,7 +74,7 @@ export const sanitizeWidgets = (value: unknown): HomeWidgets => {
   }
 
   const ids = new Set<string>();
-  let hasStats = false;
+  const singles = new Set<WidgetType>();
   const widgets = list.flatMap((item: any) => {
     const id = item?.id;
     const type = item?.type as WidgetType;
@@ -73,12 +82,12 @@ export const sanitizeWidgets = (value: unknown): HomeWidgets => {
       return [];
     }
 
-    if (type === 'stats') {
-      if (hasStats) {
+    if (isSingleWidget(type)) {
+      if (singles.has(type)) {
         return [];
       }
 
-      hasStats = true;
+      singles.add(type);
     }
 
     ids.add(id);

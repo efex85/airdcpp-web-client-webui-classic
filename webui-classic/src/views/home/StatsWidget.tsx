@@ -1,10 +1,12 @@
-// Uptime, speed and transfer statistics
+// Uptime, transfers, share, hashing and disk space
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAccess } from '../../lib/access';
 import { formatSize, formatUptime } from '../../lib/format';
 import { useApp } from '../../store/app';
 import { socket } from '../../store/session';
+import { DiskStats } from './DiskStats';
+import { HashingStats } from './HashingStats';
 
 interface Transferred {
   session_downloaded: number;
@@ -118,40 +120,47 @@ export const StatsWidget = ({ active }: { active: boolean }) => {
               <td data-stat="total-down">{totalDown === null ? '' : formatSize(totalDown)}</td>
               <td data-stat="total-up">{totalUp === null ? '' : formatSize(totalUp)}</td>
             </Row>
+            <Row title="Ratio (ul/dl)">
+              <td colSpan={2} data-stat="ratio">
+                <span>{ratio(sessionUp, sessionDown)} session</span>
+                {totalDown !== null && (
+                  <>
+                    {' · '}
+                    <span>{ratio(totalUp!, totalDown)} total</span>
+                  </>
+                )}
+              </td>
+            </Row>
+            <Row title="Download queue">
+              <td colSpan={2} data-stat="queue">
+                {formatSize(stats.queued_bytes ?? 0)}
+              </td>
+            </Row>
           </tbody>
         </table>
       ) : (
         <p className="muted">You don't have permission to see the transfer statistics.</p>
       )}
-      <table>
-        <tbody>
-          {transfers && (
-            <Row title="Share ratio (upload / download)">
-              <td data-stat="ratio">
-                {ratio(sessionUp, sessionDown)} this session
-                {totalDown !== null && `, ${ratio(totalUp!, totalDown)} in total`}
-              </td>
-            </Row>
-          )}
-          {transfers && (
-            <Row title="Download queue">
-              <td>{formatSize(stats.queued_bytes ?? 0)}</td>
-            </Row>
-          )}
-          {shareSize !== null && (
-            <Row title="Shared">
-              <td>{formatSize(shareSize)}</td>
-            </Row>
-          )}
-          {access('hubs_view') && (
-            <Row title="Hubs connected">
-              <td>
-                {hubs.filter((h) => h.connect_state.id === 'connected').length} of {hubs.length}
-              </td>
-            </Row>
-          )}
-        </tbody>
-      </table>
+      {(access('hubs_view') || shareSize !== null) && (
+        <table>
+          <tbody>
+            {access('hubs_view') && (
+              <Row title="Hubs connected">
+                <td>
+                  {hubs.filter((h) => h.connect_state.id === 'connected').length} of {hubs.length}
+                </td>
+              </Row>
+            )}
+            {shareSize !== null && (
+              <Row title="Shared">
+                <td>{formatSize(shareSize)}</td>
+              </Row>
+            )}
+          </tbody>
+        </table>
+      )}
+      {access('share_view') && <HashingStats active={active} />}
+      <DiskStats active={active} />
     </div>
   );
 };
