@@ -1,8 +1,9 @@
 // Classic "report view" list: sortable and resizable columns, multi selection, keyboard
 // navigation and context menus. Only the visible rows are rendered. On small screens each
-// item is shown on two lines.
+// item is shown on two lines. Lists can be made as wide as their longest name, to be scrolled sideways.
 
 import {
+  type CSSProperties,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -18,6 +19,7 @@ import { emptySelection, moveCursor, select, selectAll, type Selection } from '.
 import { load, save } from '../lib/storage';
 import { useLocalSettings } from '../store/localSettings';
 import { buildRows, scrollToRow, sortItems, visibleRange, type Group, type SortState, type SortValue } from '../lib/table';
+import { fontOf, widest } from '../lib/textWidth';
 import { useIsMobile } from '../lib/useIsMobile';
 import { openMenu, type MenuEntry, type MenuPosition } from '../store/ui';
 
@@ -58,6 +60,10 @@ interface Props<T> {
   onSelect?: (items: T[]) => void;
   /** Changing this number clears the selection */
   clearSelection?: number;
+  /** The first column is as wide as the longest name, so that all of it can be seen by scrolling sideways */
+  fitNames?: boolean;
+  /** A change of this value (another folder) scrolls back to the left */
+  scrollKey?: string;
   /** Tap on small screens (default: activate, or the menu for lists without a default action) */
   mobileTap?: Tap | ((item: T) => Tap);
   /** Keeps items of a lower rank first regardless of the sort order (folders before files) */
@@ -71,12 +77,19 @@ interface Preferences {
   sort?: SortState | null;
   widths?: Record<string, number>;
   hidden?: Record<string, boolean>;
+  /** false: the user has chosen the width of the names */
+  fit?: boolean;
 }
 
 const ROW_HEIGHT = 20;
 const MOBILE_ROW_HEIGHT = 46;
 const HEADER_HEIGHT = 22;
 const LONG_PRESS_MS = 500;
+/** What a name cell has beside the name: padding, the icon and a little to spare */
+const NAME_EXTRA = 36;
+const DETAIL_GAP = 10;
+/** Extremely long names don't make the list wider than this */
+const MAX_FITTED = 4000;
 
 export function DataTable<T>({
   id,
@@ -94,6 +107,8 @@ export function DataTable<T>({
   onDelete,
   onSelect,
   clearSelection,
+  fitNames,
+  scrollKey,
   mobileTap,
   rank,
   empty,
@@ -124,8 +139,53 @@ export function DataTable<T>({
   const visibleColumns = columns.filter(
     (c, i) => i === 0 || !(preferences.hidden?.[c.id] ?? c.defaultHidden ?? false),
   );
+  const fit = !!fitNames && preferences.fit !== false;
+  const [fonts, setFonts] = useState({ title: '', detail: '', right: '' });
+  /** The list is wider than its window */
+  const [wider, setWider] = useState(false);
+  /** The text that a cell shows */
+  const text = (c: Column<T>, item: T) => {
+    const rendered = c.render?.(item);
+    return typeof rendered === 'string' ? rendered : String(c.value(item));
+  };
+  // The widest name; on small screens also the widest line below the names
+  const longest = useMemo(
+    () => {
+      if (!fit || !fonts.title) {
+        return 0;
+      }
+
+      const names = widest(items, (item) => [text(columns[0], item)], fonts.title);
+      if (!mobile || !fonts.detail) {
+        return Math.min(MAX_FITTED, names);
+      }
+
+      const details = columns.filter((c) => c.mobile === 'detail');
+      const below = (item: T) => details.filter((c) => c.value(item) !== '').map((c) => text(c, item));
+      return Math.min(MAX_FITTED, Math.max(names, widest(items, below, fonts.detail, DETAIL_GAP)));
+    },
+    // The column objects are recreated on every render
+    [items, fit, fonts, mobile],
+  );
+  // On small screens the columns at the right edge keep one width, so that the list doesn't change its own while
+  // it is scrolled
+  const endWidth = useMemo(
+    () => {
+      if (!fit || !mobile || !fonts.right) {
+        return 0;
+      }
+
+      const right = columns.filter((c) => c.mobile === 'right');
+      return Math.max(0, ...right.map((c) => widest(items, (item) => [text(c, item)], fonts.right)));
+    },
+    // The column objects are recreated on every render
+    [items, fit, fonts, mobile],
+  );
   // Widths are stored for the normal text size
-  const width = (c: Column<T>) => Math.round((preferences.widths?.[c.id] ?? c.width) * scale);
+  const width = (c: Column<T>) => {
+    const chosen = Math.round((preferences.widths?.[c.id] ?? c.width) * scale);
+    return c === columns[0] && longest && !mobile ? Math.max(chosen, longest + NAME_EXTRA) : chosen;
+  };
   const totalWidth = visibleColumns.reduce((sum, c) => sum + width(c), 0);
 
   const sort = preferences.sort === undefined ? (defaultSort ?? null) : preferences.sort;
@@ -186,6 +246,30 @@ export function DataTable<T>({
   }, []);
 
   const { start, end } = visibleRange(viewport.top, viewport.height - headerHeight, rowHeight, rows.length);
+
+  // The fonts are taken from the rows on the page, as they depend on the text size and the screen
+  useLayoutEffect(() => {
+    const name = fit && scroller.current!.querySelector(mobile ? '.row-title' : '.cell');
+    if (!name) {
+      return;
+    }
+
+    const detail = scroller.current!.querySelector('.row-detail');
+    const right = scroller.current!.querySelector('.row-right');
+    const next = { title: fontOf(name), detail: detail ? fontOf(detail) : '', right: right ? fontOf(right) : '' };
+    if (next.title !== fonts.title || next.detail !== fonts.detail || next.right !== fonts.right) {
+      setFonts(next);
+    }
+  });
+
+  useLayoutEffect(() => {
+    const el = scroller.current!;
+    setWider(fit && el.scrollWidth > el.clientWidth);
+  });
+
+  useLayoutEffect(() => {
+    scroller.current!.scrollLeft = 0;
+  }, [scrollKey]);
 
   /* Menus */
 
@@ -366,6 +450,12 @@ export function DataTable<T>({
   const headerMenu = (e: MouseEvent) => {
     e.preventDefault();
     openMenu({ x: e.clientX, y: e.clientY }, [
+      ...(fitNames
+        ? [
+            { label: 'Show full names', checked: fit, onClick: () => (fit ? update({ fit: false }) : showFullNames()) },
+            'separator' as const,
+          ]
+        : []),
       ...columns.slice(1).map((c): MenuEntry => {
         const visible = visibleColumns.includes(c);
         return {
@@ -375,24 +465,42 @@ export function DataTable<T>({
         };
       }),
       'separator',
-      { label: 'Reset columns', onClick: () => update({ sort: undefined, widths: undefined, hidden: undefined }) },
+      {
+        label: 'Reset columns',
+        onClick: () => update({ sort: undefined, widths: undefined, hidden: undefined, fit: undefined }),
+      },
     ]);
+  };
+
+  /** Back to a name column that follows the longest name */
+  const showFullNames = () => {
+    const { [columns[0].id]: _, ...widths } = preferences.widths ?? {};
+    update({ fit: undefined, widths });
   };
 
   const resizeHandle = (column: Column<T>) => (
     <span
       className="th-resize"
       onClick={(e) => e.stopPropagation()}
+      onDoubleClick={() => fitNames && column === columns[0] && showFullNames()}
       onPointerDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
         const handle = e.currentTarget;
         const origin = e.clientX - width(column);
         handle.setPointerCapture(e.pointerId);
-        handle.onpointermove = (event) =>
+        const start = e.clientX;
+        handle.onpointermove = (event) => {
+          // A click on the divider, as in a double click, leaves the width as it is
+          if (event.clientX === start) {
+            return;
+          }
+
           update({
             widths: { ...preferences.widths, [column.id]: Math.max(32, Math.round((event.clientX - origin) / scale)) },
+            ...(column === columns[0] && fitNames ? { fit: false } : {}),
           });
+        };
         handle.onlostpointercapture = () => {
           handle.onpointermove = null;
         };
@@ -402,8 +510,36 @@ export function DataTable<T>({
 
   const renderCell = (c: Column<T>, item: T) => (c.render ? c.render(item) : String(c.value(item)));
 
+  const rightColumns = (item: T) => (
+    <span className="row-right">
+      {columns
+        .filter((c) => c.mobile === 'right')
+        .map((c) => (
+          <span key={c.id}>{renderCell(c, item)}</span>
+        ))}
+    </span>
+  );
+
+  const rowButton = (item: T, key: string) =>
+    menu &&
+    !selecting && (
+      <button
+        type="button"
+        className="icon-button row-menu"
+        aria-label="Actions"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelection(select(selection, order, key));
+          showRowMenu({ x: e.clientX, y: e.clientY }, [item], menuTitle([item]));
+        }}
+      >
+        <EllipsisVertical size={18} />
+      </button>
+    );
+
   return (
-    <div className={`table${mobile ? ' mobile' : ''}`}>
+    <div className={`table${mobile ? ' mobile' : ''}${fit ? ' fit' : ''}${wider ? ' wider' : ''}`}>
       {mobile && selecting && (
         <div className="table-actions">
           <button type="button" className="icon-button" aria-label="End selection" onClick={() => setSelection(emptySelection)}>
@@ -490,7 +626,14 @@ export function DataTable<T>({
         )}
         <div
           className="table-body"
-          style={{ height: rows.length * rowHeight, minWidth: mobile ? undefined : totalWidth }}
+          style={
+            {
+              height: rows.length * rowHeight,
+              minWidth: mobile ? undefined : totalWidth,
+              '--name-width': mobile && longest ? `${longest}px` : undefined,
+              '--end-width': endWidth ? `${endWidth}px` : undefined,
+            } as CSSProperties
+          }
         >
           <div style={{ transform: `translateY(${start * rowHeight}px)` }}>
             {rows.slice(start, end).map((row) => {
@@ -558,27 +701,17 @@ export function DataTable<T>({
                             ))}
                         </span>
                       </span>
-                      <span className="row-right">
-                        {columns
-                          .filter((c) => c.mobile === 'right')
-                          .map((c) => (
-                            <span key={c.id}>{renderCell(c, item)}</span>
-                          ))}
-                      </span>
-                      {menu && !selecting && (
-                        <button
-                          type="button"
-                          className="icon-button row-menu"
-                          aria-label="Actions"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelection(select(selection, order, key));
-                            showRowMenu({ x: e.clientX, y: e.clientY }, [item], menuTitle([item]));
-                          }}
-                        >
-                          <EllipsisVertical size={18} />
-                        </button>
+                      {fit ? (
+                        // Stays at the right edge while the names are scrolled
+                        <span className="row-end">
+                          {rightColumns(item)}
+                          {rowButton(item, key)}
+                        </span>
+                      ) : (
+                        <>
+                          {rightColumns(item)}
+                          {rowButton(item, key)}
+                        </>
                       )}
                     </>
                   ) : (

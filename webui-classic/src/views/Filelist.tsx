@@ -251,6 +251,8 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
     <DataTable
       id="filelist"
       label="Files"
+      fitNames
+      scrollKey={path}
       columns={COLUMNS}
       items={shown}
       itemKey={(i) => String(i.id)}

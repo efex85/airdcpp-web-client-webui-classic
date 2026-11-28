@@ -14,6 +14,7 @@ import {
   shortcutList,
   type KeyPress,
 } from '../src/lib/shortcuts';
+import { needsHistoryButtons } from '../src/lib/historyButtons';
 
 const press = (key: string, code: string, modifiers = ''): KeyPress => ({
   key,
@@ -145,5 +146,33 @@ describe('shortcuts', () => {
     expect(neighbourWindow(['a', 'b', 'c'], 'a', -1)).toBe('c');
     expect(neighbourWindow(['a', 'b'], 'gone', 1)).toBe('a');
     expect(neighbourWindow([], 'a', 1)).toBeUndefined();
+  });
+});
+
+describe('browsers that keep the thumb buttons to themselves', () => {
+  const firefox = (version: number, system = 'Windows NT 10.0; Win64; x64') =>
+    `Mozilla/5.0 (${system}; rv:${version}.0) Gecko/20100101 Firefox/${version}.0`;
+
+  it('are Firefox on a computer before version 162', () => {
+    expect(needsHistoryButtons(firefox(161))).toBe(true);
+    expect(needsHistoryButtons(firefox(140, 'X11; Linux x86_64'))).toBe(true);
+    expect(needsHistoryButtons(firefox(153, 'Macintosh; Intel Mac OS X 10.15'))).toBe(true);
+    expect(needsHistoryButtons(firefox(162))).toBe(false);
+    expect(needsHistoryButtons(firefox(200))).toBe(false);
+  });
+
+  it('are not phones, tablets or other browsers', () => {
+    expect(needsHistoryButtons('Mozilla/5.0 (Android 15; Mobile; rv:161.0) Gecko/161.0 Firefox/161.0')).toBe(false);
+    expect(needsHistoryButtons('Mozilla/5.0 (Android 15; Tablet; rv:161.0) Gecko/161.0 Firefox/161.0')).toBe(false);
+    expect(
+      needsHistoryButtons(
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/161.0 Mobile/15E148 Safari/605.1.15',
+      ),
+    ).toBe(false);
+    expect(
+      needsHistoryButtons(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
+      ),
+    ).toBe(false);
   });
 });

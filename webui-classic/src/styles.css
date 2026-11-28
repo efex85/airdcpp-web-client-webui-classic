@@ -841,6 +841,46 @@ textarea[aria-invalid='true'] {
   font-size: calc(12px * var(--font-scale));
 }
 
+/* Small screens: lists that are scrolled sideways to read long names */
+.table.mobile.fit .table-body {
+  width: max-content;
+  /* Not "hidden", which would keep the right end of the rows from staying in place */
+  overflow: clip;
+}
+
+.table.mobile.fit .row-text {
+  flex: 1 0 auto;
+  min-width: var(--name-width, 0px);
+}
+
+.table.mobile.fit .row-right {
+  min-width: var(--end-width, 0px);
+}
+
+.row-end {
+  position: sticky;
+  right: 0;
+  display: flex;
+  flex: none;
+  align-self: stretch;
+  align-items: center;
+  gap: 8px;
+  padding-left: 8px;
+}
+
+/* The names pass behind it */
+.table.wider .row-end {
+  background: var(--bg);
+}
+
+.table.wider .tr:hover .row-end {
+  background: linear-gradient(var(--row-hover), var(--row-hover)), var(--bg);
+}
+
+.table.wider .tr.selected .row-end {
+  background: var(--select);
+}
+
 .row-menu {
   align-self: stretch;
   padding: 0 8px;

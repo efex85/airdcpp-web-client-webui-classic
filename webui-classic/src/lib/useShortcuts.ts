@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { runShortcut } from '../actions/shortcuts';
 import { shortcutsDoc } from '../store/docs';
 import { closeMenu, useUi } from '../store/ui';
+import { catchHistoryButtons, needsHistoryButtons } from './historyButtons';
 import { combinationOf, findShortcut } from './shortcuts';
 
 /** MouseEvent.button of the two thumb buttons */
@@ -58,10 +59,26 @@ export const useShortcuts = () => {
       }
     };
 
+    // For a browser that only goes back or forward when the buttons are pressed
+    const stopCatching = needsHistoryButtons(navigator.userAgent)
+      ? catchHistoryButtons({
+          wanted: () => shortcutsDoc.value.mouse,
+          press: (button) => {
+            const action = findShortcut(shortcutsDoc.value, 'mouse', button);
+            if (action && !dialogOpen()) {
+              run(action.id);
+            }
+
+            return !!action;
+          },
+        })
+      : undefined;
+
     const buttonEvents = ['mousedown', 'mouseup', 'auxclick'] as const;
     window.addEventListener('keydown', onKey, true);
     buttonEvents.forEach((type) => window.addEventListener(type, onButton, true));
     return () => {
+      stopCatching?.();
       window.removeEventListener('keydown', onKey, true);
       buttonEvents.forEach((type) => window.removeEventListener(type, onButton, true));
     };
