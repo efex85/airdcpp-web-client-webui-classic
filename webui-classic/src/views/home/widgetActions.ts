@@ -1,12 +1,13 @@
 // Adding, changing and removing the widgets of the Home window
 import type { ReactNode } from 'react';
+import { isMobile } from '../../lib/useIsMobile';
+import { isNormalSize, sizeOf } from '../../lib/widgetSizes';
 import {
   createWidget,
   isSingleWidget,
   MAX_WIDGETS,
   moveWidget,
   newWidgetId,
-  setWidgetRows,
   WIDGET_HEIGHTS,
   WIDGET_NAMES,
   type Widget,
@@ -15,6 +16,7 @@ import {
 import { toast } from '../../store/app';
 import { noteDoc, removeWidget, widgetsDoc } from '../../store/docs';
 import { confirm, showDialog, type MenuEntry } from '../../store/ui';
+import { forgetWidgetSize, setWidgetSize, useWidgetSizes } from '../../store/widgetSizes';
 import { isFeedAddress } from './RssWidget';
 
 const list = () => widgetsDoc.value.list;
@@ -113,8 +115,38 @@ export const askRemoveWidget = async (widget: Widget, title: string) => {
       ? `Remove “${title}” and its text from all your devices? This can't be undone.`
       : `Remove “${title}” from all your devices?`;
   if (!hasContent || (await confirm('Remove widget', text, 'Remove'))) {
+    forgetWidgetSize(widget.id);
     await removeWidget(widget.id);
   }
+};
+
+/** The sizes of this browser; phones size the boxes themselves */
+const sizeMenu = (widget: Widget): MenuEntry[] => {
+  if (isMobile()) {
+    return [];
+  }
+
+  const size = sizeOf(useWidgetSizes.getState().sizes, widget);
+  return [
+    // System information is as high as its content unless it's resized by hand
+    ...(widget.type === 'stats'
+      ? []
+      : [
+          {
+            label: 'Height',
+            children: WIDGET_HEIGHTS.map(([rows, label]) => ({
+              label,
+              checked: size.h === undefined && (size.rows ?? 1) === rows,
+              onClick: () => setWidgetSize(widget.id, { ...(size.w ? { w: size.w } : {}), rows }),
+            })),
+          },
+        ]),
+    {
+      label: 'Reset size',
+      disabled: isNormalSize(size),
+      onClick: () => setWidgetSize(widget.id, {}),
+    },
+  ];
 };
 
 export const widgetMenu = (widget: Widget, title: string): MenuEntry[] => {
@@ -127,15 +159,8 @@ export const widgetMenu = (widget: Widget, title: string): MenuEntry[] => {
             label: widget.type === 'rss' ? 'Settings…' : 'Rename…',
             onClick: () => void editWidget(widget),
           },
-          {
-            label: 'Height',
-            children: WIDGET_HEIGHTS.map(([rows, label]) => ({
-              label,
-              checked: (widget.rows ?? 1) === rows,
-              onClick: () => widgetsDoc.set({ list: setWidgetRows(list(), widget.id, rows) }),
-            })),
-          },
         ]),
+    ...sizeMenu(widget),
     {
       label: 'Move earlier',
       disabled: index <= 0,
