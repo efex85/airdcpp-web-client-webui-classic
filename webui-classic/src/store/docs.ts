@@ -147,7 +147,7 @@ export const removeWidget = async (id: string) => {
   }
 
   const note = widget.type === 'notes' ? noteDoc(id) : null;
-  widgetsDoc.set({ list: widgetsDoc.value.list.filter((w) => w.id !== id) });
+  widgetsDoc.set({ ...widgetsDoc.value, list: widgetsDoc.value.list.filter((w) => w.id !== id) });
   // The list is saved first: other devices must not bring the text back
   await widgetsDoc.flush();
   if (note) {
@@ -162,3 +162,7 @@ export const useDoc = <T>(doc: SyncedDoc<T>): T => useSyncExternalStore(doc.subs
 
 export const useDocStatus = <T>(doc: SyncedDoc<T>): SyncStatus =>
   useSyncExternalStore(doc.subscribe, doc.getSnapshot).status;
+
+/** False until the client has answered: until then the value may be an old copy, or the default */
+export const useDocLoaded = <T>(doc: SyncedDoc<T>): boolean =>
+  useSyncExternalStore(doc.subscribe, doc.getSnapshot).loaded;

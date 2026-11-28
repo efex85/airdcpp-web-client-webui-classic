@@ -1,6 +1,5 @@
 // Adding, changing and removing the widgets of the Home window
 import type { ReactNode } from 'react';
-import { isMobile } from '../../lib/useIsMobile';
 import { isNormalSize, sizeOf } from '../../lib/widgetSizes';
 import {
   createWidget,
@@ -8,6 +7,7 @@ import {
   MAX_WIDGETS,
   moveWidget,
   newWidgetId,
+  orderWidgets,
   WIDGET_HEIGHTS,
   WIDGET_NAMES,
   type Widget,
@@ -16,13 +16,27 @@ import {
 import { toast } from '../../store/app';
 import { noteDoc, removeWidget, widgetsDoc } from '../../store/docs';
 import { confirm, showDialog, type MenuEntry } from '../../store/ui';
+import { addedHere, forgetWidgetPlace } from '../../store/widgetLayout';
 import { forgetWidgetSize, setWidgetSize, useWidgetSizes } from '../../store/widgetSizes';
 import { isFeedAddress } from './RssWidget';
 
 const list = () => widgetsDoc.value.list;
 
+const setList = (next: Widget[]) => widgetsDoc.set({ ...widgetsDoc.value, list: next });
+
 export const updateWidget = (id: string, changes: Partial<Widget>) =>
-  widgetsDoc.set({ list: list().map((w) => (w.id === id ? { ...w, ...changes } : w)) });
+  setList(list().map((w) => (w.id === id ? { ...w, ...changes } : w)));
+
+/**
+ * The order that phones show the widgets in follows the places on this screen. When the user has `rearranged` them,
+ * that is also noted if the order stays as it was.
+ */
+export const orderByPlaces = (ids: string[], rearranged: boolean) => {
+  const next = orderWidgets(list(), ids);
+  if (next.some((widget, i) => widget !== list()[i]) || (rearranged && !widgetsDoc.value.ordered)) {
+    widgetsDoc.set({ ...widgetsDoc.value, list: next, ordered: true });
+  }
+};
 
 /** Title, and for feeds the address and interval; null if cancelled */
 const askSettings = async (type: WidgetType, widget?: Widget): Promise<Partial<Widget> | null> => {
@@ -82,8 +96,9 @@ const addWidget = async (type: WidgetType) => {
   }
 
   const widget = createWidget(type, newWidgetId(), values);
+  addedHere.add(widget.id);
   // The statistics are shown first
-  widgetsDoc.set({ list: type === 'stats' ? [widget, ...list()] : [...list(), widget] });
+  setList(type === 'stats' ? [widget, ...list()] : [...list(), widget]);
   requestAnimationFrame(() =>
     document.querySelector(`[data-widget="${widget.id}"]`)?.scrollIntoView({ block: 'nearest' }),
   );
@@ -116,16 +131,13 @@ export const askRemoveWidget = async (widget: Widget, title: string) => {
       : `Remove “${title}” from all your devices?`;
   if (!hasContent || (await confirm('Remove widget', text, 'Remove'))) {
     forgetWidgetSize(widget.id);
+    forgetWidgetPlace(widget.id);
     await removeWidget(widget.id);
   }
 };
 
-/** The sizes of this browser; phones size the boxes themselves */
+/** The sizes of this browser */
 const sizeMenu = (widget: Widget): MenuEntry[] => {
-  if (isMobile()) {
-    return [];
-  }
-
   const size = sizeOf(useWidgetSizes.getState().sizes, widget);
   return [
     // System information is as high as its content unless it's resized by hand
@@ -149,29 +161,43 @@ const sizeMenu = (widget: Widget): MenuEntry[] => {
   ];
 };
 
-export const widgetMenu = (widget: Widget, title: string): MenuEntry[] => {
+/** Where the widgets are stacked, their order is changed here */
+const orderMenu = (widget: Widget): MenuEntry[] => {
   const index = list().findIndex((w) => w.id === widget.id);
   return [
-    ...(widget.type === 'stats'
-      ? []
-      : [
-          {
-            label: widget.type === 'rss' ? 'Settings…' : 'Rename…',
-            onClick: () => void editWidget(widget),
-          },
-        ]),
-    ...sizeMenu(widget),
     {
-      label: 'Move earlier',
+      label: 'Move up',
       disabled: index <= 0,
-      onClick: () => widgetsDoc.set({ list: moveWidget(list(), widget.id, -1) }),
+      onClick: () => setList(moveWidget(list(), widget.id, -1)),
     },
     {
-      label: 'Move later',
+      label: 'Move down',
       disabled: index >= list().length - 1,
-      onClick: () => widgetsDoc.set({ list: moveWidget(list(), widget.id, 1) }),
+      onClick: () => setList(moveWidget(list(), widget.id, 1)),
     },
-    'separator',
-    { label: 'Remove', onClick: () => void askRemoveWidget(widget, title) },
   ];
 };
+
+/**
+ * `sized`: the widgets have places and sizes of their own. `arrangeToFit` is given on large screens, also where the
+ * window is too narrow for the places.
+ */
+export const widgetMenu = (
+  widget: Widget,
+  title: string,
+  sized: boolean,
+  arrangeToFit: (() => void) | undefined,
+): MenuEntry[] => [
+  ...(widget.type === 'stats'
+    ? []
+    : [
+        {
+          label: widget.type === 'rss' ? 'Settings…' : 'Rename…',
+          onClick: () => void editWidget(widget),
+        },
+      ]),
+  ...(sized ? sizeMenu(widget) : orderMenu(widget)),
+  ...(arrangeToFit ? [{ label: 'Arrange to fit this window', onClick: arrangeToFit }] : []),
+  'separator',
+  { label: 'Remove', onClick: () => void askRemoveWidget(widget, title) },
+];

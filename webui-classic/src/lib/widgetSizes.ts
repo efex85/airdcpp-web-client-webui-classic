@@ -53,9 +53,7 @@ export const clampWidth = (units: number, columns: number, min = MIN_UNITS): num
 export const sizeOf = (sizes: WidgetSizes, widget: Widget): WidgetSize =>
   sizes[widget.id] ?? (widget.rows ? { rows: widget.rows } : {});
 
-/** A box that is wider than the window is as wide as the window; its own width comes back in a wider one */
-export const widthUnits = (size: WidgetSize, columns: number, min = MIN_UNITS): number =>
-  clampWidth(size.w ?? BOX_UNITS, columns, min);
+export const widthUnits = (size: WidgetSize, min = MIN_UNITS): number => Math.max(size.w ?? BOX_UNITS, min);
 
 export const heightPixels = (size: WidgetSize, normal: number): number =>
   size.h ?? (size.rows ?? 1) * (normal + GAP) - GAP;

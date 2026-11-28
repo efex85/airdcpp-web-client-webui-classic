@@ -1,6 +1,6 @@
 // Navigation on small screens: a title bar and a drawer with the open windows
 import { EllipsisVertical, Menu as MenuIcon, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { closeWindow } from '../actions';
 import { MAIN_MENU, windowMenu } from '../actions/mainMenu';
 import { tabEventStyle } from '../lib/tabEvents';
@@ -13,6 +13,10 @@ export const MobileBar = () => {
   const state = useApp();
   const { highlight } = useDoc(colorsDoc);
   const [open, setOpen] = useState(false);
+  /** The full title of a hub is shown below the bar */
+  const [full, setFull] = useState(false);
+  // Closed again in another window
+  useEffect(() => setFull(false), [state.active]);
   const info = state.active ? windowInfo(state.active, state, highlight) : null;
   const others = state.tabs
     .filter((key) => key !== state.active)
@@ -25,10 +29,26 @@ export const MobileBar = () => {
         <MenuIcon size={20} />
         {attention && <span className={`dot ${attention}`} />}
       </button>
-      <span className="topbar-title">
-        {info?.icon}
-        <span>{info?.title ?? 'AirDC++ Classic'}</span>
-      </span>
+      {info?.topic ? (
+        // The topic of a hub below its name; a tap shows all of it
+        <button
+          type="button"
+          className="topbar-title"
+          aria-expanded={full}
+          onClick={() => setFull(!full)}
+        >
+          {info.icon}
+          <span className="topbar-names">
+            <span>{info.title}</span>
+            <span className="topbar-topic">{info.topic}</span>
+          </span>
+        </button>
+      ) : (
+        <span className="topbar-title">
+          {info?.icon}
+          <span>{info?.title ?? 'AirDC++ Classic'}</span>
+        </span>
+      )}
       {info && (
         <button
           type="button"
@@ -48,6 +68,7 @@ export const MobileBar = () => {
           <X size={20} />
         </button>
       )}
+      {info?.topic && full && <div className="topbar-caption">{info.caption}</div>}
       {open && (
         <div className="drawer-overlay" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
           <aside className="drawer">

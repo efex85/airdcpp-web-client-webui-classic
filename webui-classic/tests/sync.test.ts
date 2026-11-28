@@ -73,6 +73,30 @@ describe('synced documents', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
+  it('tells when the client has answered', async () => {
+    const { state, transport } = server();
+    const a = device(transport);
+    const b = device(transport);
+    expect(a.doc.getSnapshot().loaded).toBe(false);
+    let told = 0;
+    a.doc.subscribe(() => told++);
+    await a.doc.sync(); // Nothing stored yet
+    expect(a.doc.getSnapshot().loaded).toBe(true);
+    expect(told).toBe(1);
+
+    a.doc.set('text');
+    await a.doc.flush();
+    await b.doc.sync();
+    expect(b.doc.getSnapshot()).toMatchObject({ value: 'text', loaded: true });
+    b.doc.detach();
+    expect(b.doc.getSnapshot().loaded).toBe(false);
+
+    state.patched = false;
+    const c = device(transport);
+    await c.doc.sync();
+    expect(c.doc.getSnapshot()).toMatchObject({ status: 'local', loaded: true });
+  });
+
   it('saves a change after a pause and shows it on another device', async () => {
     const { state, transport } = server();
     const a = device(transport);

@@ -47,7 +47,9 @@ const errorCode = (e: unknown) => (e as { code?: number } | null)?.code;
 
 export class SyncedDoc<T> {
   private record: DocRecord<T>;
-  private snapshot: { value: T; status: SyncStatus };
+  private snapshot: { value: T; status: SyncStatus; loaded: boolean };
+  /** The client has answered since the user logged in */
+  private fetched = false;
   private transport: Transport | null = null;
   private cache: Cache | null = null;
   private unsupported = false;
@@ -60,7 +62,7 @@ export class SyncedDoc<T> {
 
   constructor(readonly options: DocOptions<T>) {
     this.record = this.emptyRecord();
-    this.snapshot = { value: this.record.value, status: 'synced' };
+    this.snapshot = { value: this.record.value, status: 'synced', loaded: false };
   }
 
   get value(): T {
@@ -86,6 +88,7 @@ export class SyncedDoc<T> {
     this.transport = transport;
     this.cache = cache;
     this.unsupported = false;
+    this.fetched = false;
     this.record = this.readCache();
     this.publish();
   }
@@ -99,6 +102,7 @@ export class SyncedDoc<T> {
 
     this.transport = null;
     this.cache = null;
+    this.fetched = false;
     this.record = this.emptyRecord();
     this.publish();
   }
@@ -176,6 +180,7 @@ export class SyncedDoc<T> {
       // A client without the patch doesn't know the request
       if (errorCode(e) === 400 || errorCode(e) === 404) {
         this.unsupported = true;
+        this.fetched = true;
         this.publish();
         return;
       }
@@ -188,8 +193,20 @@ export class SyncedDoc<T> {
     }
 
     this.unsupported = false;
+    await this.apply(server, attempt);
+  }
+
+  /** Takes over what the client has, saving local changes */
+  private async apply(server: { revision: number; value: unknown }, attempt: number): Promise<void> {
+    // Published together with the value
+    const first = !this.fetched;
+    this.fetched = true;
     const { defaults, sanitize, merge } = this.options;
     if (server.revision === this.record.revision) {
+      if (first) {
+        this.publish();
+      }
+
       if (this.record.dirty) {
         await this.push(attempt);
       }
@@ -281,8 +298,10 @@ export class SyncedDoc<T> {
 
   private publish() {
     const status: SyncStatus = this.unsupported ? 'local' : this.record.dirty ? 'pending' : 'synced';
-    if (this.snapshot.value !== this.record.value || this.snapshot.status !== status) {
-      this.snapshot = { value: this.record.value, status };
+    const loaded = this.fetched;
+    const { value } = this.record;
+    if (this.snapshot.value !== value || this.snapshot.status !== status || this.snapshot.loaded !== loaded) {
+      this.snapshot = { value, status, loaded };
       for (const listener of this.listeners) {
         listener();
       }

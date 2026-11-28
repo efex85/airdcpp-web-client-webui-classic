@@ -1,7 +1,7 @@
 // What the sizes of the widgets depend on: the width of the window and the height of the statistics
 
 import { useEffect, useLayoutEffect, useState } from 'react';
-import { columnCount, GAP, NORMAL_HEIGHT, normalHeight } from '../../lib/widgetSizes';
+import { GAP, NORMAL_HEIGHT, normalHeight } from '../../lib/widgetSizes';
 import { useLocalSettings } from '../../store/localSettings';
 
 /**
@@ -12,7 +12,8 @@ export const useHomeGrid = (others: number | undefined) => {
   const [grid, setGrid] = useState<HTMLElement | null>(null);
   /** Around the content of System information; null without that widget */
   const [statistics, setStatistics] = useState<HTMLElement | null>(null);
-  const [columns, setColumns] = useState(0);
+  /** Without the padding */
+  const [width, setWidth] = useState(0);
   const [needed, setNeeded] = useState(0);
   const scale = useLocalSettings((s) => s.ui_text_size) / 100;
 
@@ -22,7 +23,7 @@ export const useHomeGrid = (others: number | undefined) => {
       return;
     }
 
-    const measure = () => grid.clientWidth && setColumns(columnCount(grid.clientWidth - 2 * GAP));
+    const measure = () => grid.clientWidth && setWidth(grid.clientWidth - 2 * GAP);
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(grid);
@@ -48,7 +49,8 @@ export const useHomeGrid = (others: number | undefined) => {
   }, [statistics]);
 
   return {
-    columns,
+    width,
+    scale,
     normal: normalHeight(Math.max(NORMAL_HEIGHT * scale, statistics ? (others ?? needed) : 0)),
     setGrid,
     setStatistics,

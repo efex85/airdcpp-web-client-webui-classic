@@ -18,12 +18,17 @@ import {
 import type { ReactNode } from 'react';
 import { windowId, windowType, type AppState } from '../store/app';
 import { colorsDoc } from '../store/docs';
+import { hubCaption, hubTopic } from './hubTitle';
 import { currentTabEvent, type TabEventId, type TabHighlights } from './tabEvents';
 
 export type Attention = 'mention' | 'unread' | null;
 
 export interface WindowInfo {
   title: string;
+  /** Hubs: the full title, with the topic */
+  caption?: string;
+  /** Hubs: the topic */
+  topic?: string;
   icon: ReactNode;
   attention: Attention;
   /** Chats: what has happened, which decides how the tab looks */
@@ -64,6 +69,8 @@ export const windowInfo = (
       const event = currentTabEvent('hub', hub?.message_counts.unread, highlight);
       return {
         title: hub?.identity.name || hub?.hub_url || 'Hub',
+        caption: hub && hubCaption(hub),
+        topic: hub && hubTopic(hub),
         detail: hub && `${hub.hub_url}: ${hub.connect_state.str}`,
         icon: <Server size={ICON} className={`i-hub ${hub?.connect_state.id ?? ''}`} />,
         attention: event?.level ?? null,

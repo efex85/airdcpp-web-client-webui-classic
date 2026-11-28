@@ -17,7 +17,10 @@ export interface Widget {
 }
 
 export interface HomeWidgets {
+  /** In the order that phones show them in */
   list: Widget[];
+  /** The order has been taken from the places on a large screen: column by column, from top to bottom */
+  ordered?: boolean;
 }
 
 export const WIDGET_NAMES: Record<WidgetType, string> = {
@@ -91,7 +94,10 @@ export const sanitizeWidgets = (value: unknown): HomeWidgets => {
     ];
   });
 
-  return { list: widgets.slice(0, MAX_WIDGETS) };
+  return {
+    list: widgets.slice(0, MAX_WIDGETS),
+    ...((value as HomeWidgets).ordered === true ? { ordered: true } : {}),
+  };
 };
 
 export const moveWidget = (list: Widget[], id: string, offset: -1 | 1): Widget[] => {
@@ -104,6 +110,12 @@ export const moveWidget = (list: Widget[], id: string, offset: -1 | 1): Widget[]
   const next = list.slice();
   [next[from], next[to]] = [next[to]!, next[from]!];
   return next;
+};
+
+/** The list in the order of the IDs; widgets that aren't among them stay at the end */
+export const orderWidgets = (list: Widget[], ids: string[]): Widget[] => {
+  const place = (widget: Widget) => (ids.includes(widget.id) ? ids.indexOf(widget.id) : ids.length);
+  return list.slice().sort((a, b) => place(a) - place(b));
 };
 
 export const newWidgetId = (): string =>

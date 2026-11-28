@@ -6,6 +6,7 @@ import { MobileBar } from './components/MobileBar';
 import { Splitter } from './components/Splitter';
 import { StatusBar } from './components/StatusBar';
 import { TabBar } from './components/TabBar';
+import { TitleBar } from './components/TitleBar';
 import { Toolbar } from './components/Toolbar';
 import { windowInfo } from './lib/windows';
 import { useIsMobile } from './lib/useIsMobile';
@@ -111,6 +112,7 @@ const Main = () => {
         <MobileBar />
       ) : (
         <>
+          <TitleBar />
           <MenuBar />
           <Toolbar />
         </>

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CONFLICT_MARKER, equal, merge, mergeText } from '../src/lib/merge';
 import { sanitizeStartup, startupTabs } from '../src/lib/startup';
 import { rememberWindow, windowAfterClose } from '../src/lib/windowHistory';
-import { createWidget, DEFAULT_WIDGETS, moveWidget, newWidgetId, sanitizeWidgets } from '../src/lib/widgets';
+import { createWidget, DEFAULT_WIDGETS, moveWidget, newWidgetId, orderWidgets, sanitizeWidgets } from '../src/lib/widgets';
 import {
   columnCount,
   heightPixels,
@@ -137,6 +137,9 @@ describe('widgets', () => {
 
   it('uses the defaults if nothing sensible is stored', () => {
     expect(sanitizeWidgets(null)).toBe(DEFAULT_WIDGETS);
+    // Whether the order has been taken from a large screen
+    expect(sanitizeWidgets({ list: [], ordered: true })).toEqual({ list: [], ordered: true });
+    expect(sanitizeWidgets({ list: [], ordered: 'yes' })).toEqual({ list: [] });
   });
 
   it('can be reordered', () => {
@@ -190,13 +193,12 @@ describe('widget sizes', () => {
     expect(normalHeight(343)).toBe(352);
   });
 
-  it('makes a box that is too wide as wide as the window', () => {
-    expect(widthUnits({}, 12)).toBe(4);
-    expect(widthUnits({ w: 10 }, 12)).toBe(10);
-    expect(widthUnits({ w: 10 }, 4)).toBe(4);
-    expect(widthUnits({ w: 2 }, 12)).toBe(2);
-    expect(widthUnits({ w: 2 }, 12, minUnits('stats'))).toBe(3);
-    expect(widthUnits({ w: 2 }, 12, minUnits('notes'))).toBe(2);
+  it('keeps the width of a box, which has a smallest one', () => {
+    expect(widthUnits({})).toBe(4);
+    expect(widthUnits({ w: 10 })).toBe(10);
+    expect(widthUnits({ w: 2 })).toBe(2);
+    expect(widthUnits({ w: 2 }, minUnits('stats'))).toBe(3);
+    expect(widthUnits({ w: 2 }, minUnits('notes'))).toBe(2);
   });
 
   it('gives preset heights in normal boxes, and own heights in pixels', () => {
@@ -354,5 +356,13 @@ describe('recent searches', () => {
     const history = ['old', 'new'];
     expect(recentSearches(history)).toEqual(['new', 'old']);
     expect(history).toEqual(['old', 'new']);
+  });
+});
+
+describe('the order of widgets', () => {
+  it('follows the given IDs, with other widgets at the end', () => {
+    const list = ['a', 'b', 'c', 'd'].map((id) => createWidget('notes', id));
+    expect(orderWidgets(list, ['c', 'a']).map((w) => w.id)).toEqual(['c', 'a', 'b', 'd']);
+    expect(orderWidgets(list, [])).toEqual(list);
   });
 });

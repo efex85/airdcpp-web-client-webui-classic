@@ -174,6 +174,19 @@ textarea[aria-invalid='true'] {
   user-select: none;
 }
 
+/* The name of the program and the title of the shown window, with the topic of a hub */
+.titlebar {
+  flex: none;
+  overflow: hidden;
+  padding: 3px 8px 1px;
+  background: var(--chrome);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  /* The topic can be marked and copied */
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .app-main {
   position: relative;
   display: flex;
@@ -2235,6 +2248,8 @@ fieldset.field {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  /* The widgets mustn't change when a scrollbar comes or goes */
+  scrollbar-gutter: stable;
 }
 
 /* Left to right, row by row. The grid has no fixed height, so that every row gets the height it needs. */
@@ -2267,14 +2282,15 @@ fieldset.field {
   contain: size;
 }
 
-/* Large screens: a fine grid, in which every box has its own size (set by the page). Later boxes move up into
-   free places. */
+/* Large screens: a fine grid, in which every box has its own size and place (set by the page). A wider window
+   leaves room to the right. */
 .home-grid.sized {
-  grid-template-columns: repeat(var(--home-columns), minmax(0, 1fr));
+  position: relative;
+  grid-template-columns: repeat(var(--home-columns), var(--home-step));
   grid-auto-rows: 10px;
-  grid-auto-flow: row dense;
   row-gap: 0;
   align-content: start;
+  justify-content: start;
   padding-bottom: 0;
 }
 
@@ -2288,6 +2304,89 @@ fieldset.field {
 .widget.resizing {
   z-index: 1;
   border-color: var(--accent);
+}
+
+/* A box that is dragged by its title bar */
+.sized > .widget > header {
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.home-grid.dragging {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.home-grid.dragging,
+.sized.dragging > .widget > header,
+.sized.dragging > .widget > header button {
+  cursor: grabbing;
+}
+
+.sized > .widget.moving {
+  z-index: 3;
+  margin: 0;
+  border-color: var(--accent);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 55%);
+  opacity: 0.92;
+}
+
+.widget-placeholder {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px dashed var(--accent);
+}
+
+/* The icon of the title bar, which also moves the box with the arrow keys */
+.widget > header button.widget-grip {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 0;
+  margin: 0 -2px;
+  padding: 2px;
+  background: transparent;
+  border: 0;
+  cursor: grab;
+}
+
+/* A narrow window on a large screen: one box below the other, as on phones, each as high as its content and at
+   most the normal height */
+.home-grid.stacked {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: max-content;
+  align-items: start;
+}
+
+.stacked > .widget:not(.widget-stats) {
+  contain: none;
+  max-height: calc(340px * var(--font-scale));
+}
+
+.stacked :is(.widget-scroll, .widget-setup, .notes-box) {
+  flex: 0 1 auto;
+}
+
+/* A text field doesn't grow with its text: an invisible copy of the text in the same place sets the height */
+.stacked .notes-box {
+  display: grid;
+  grid-template: minmax(0, auto) / minmax(0, 1fr);
+  min-height: calc(90px * var(--font-scale));
+}
+
+.stacked .notes-box::after {
+  content: attr(data-value) ' ';
+  visibility: hidden;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.stacked .notes-box::after,
+.stacked textarea.notes {
+  grid-area: 1 / 1;
+  padding: 6px 8px;
+  line-height: 1.45;
 }
 
 /* The corners that are dragged to resize a box */
@@ -2979,6 +3078,7 @@ textarea.notes {
   .topbar {
     display: flex;
     flex: none;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
     padding: 4px 6px;
@@ -3007,6 +3107,41 @@ textarea.notes {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+  }
+
+  /* A hub with a topic: the title is a button */
+  .topbar button.topbar-title {
+    justify-content: flex-start;
+    min-height: 40px;
+    padding: 0;
+    background: none;
+    border: 0;
+    text-align: left;
+  }
+
+  .topbar-names {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.25;
+  }
+
+  .topbar-topic {
+    color: var(--muted);
+    font-size: calc(12px * var(--font-scale));
+    font-weight: normal;
+  }
+
+  .topbar-caption {
+    flex-basis: 100%;
+    max-height: 30vh;
+    overflow: auto;
+    padding: 2px 6px 4px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   .dot {
