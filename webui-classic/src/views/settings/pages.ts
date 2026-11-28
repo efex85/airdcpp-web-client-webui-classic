@@ -19,6 +19,7 @@ import {
   SkippingPage,
 } from './pages/downloads';
 import { EmojiPage } from './pages/emoji';
+import { AppIconPage } from './pages/icon';
 import { CatalogPage, ExtensionEnginesPage, ExtensionOptionsPage, ExtensionsPage } from './pages/extensions';
 import { ColorsPage, StartupPage, TextPage } from './pages/personal';
 import { ShortcutsPage } from './pages/shortcuts';
@@ -129,6 +130,7 @@ export const PAGE_GROUPS: PageGroup[] = [
     [
       ['startup', 'Home and startup', StartupPage, null],
       ['colors', 'Colors', ColorsPage, null],
+      ['icon', 'App icon', AppIconPage, null],
       ['tabs', 'Tab highlights', TabsPage, null],
       ['text', 'Text and chat', TextPage, null],
       ['emoji', 'Emoji', EmojiPage, null],

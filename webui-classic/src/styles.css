@@ -2066,6 +2066,40 @@ fieldset.field {
   gap: 8px;
 }
 
+/* The chosen icon in the sizes that browsers and phones show it in */
+.icon-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin: 6px 0 12px;
+}
+
+.icon-preview .icon-large {
+  width: 96px;
+  height: 96px;
+}
+
+.icon-preview .icon-medium {
+  width: 32px;
+  height: 32px;
+}
+
+.icon-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--chrome);
+  border: 1px solid var(--border-strong);
+  border-bottom: 0;
+}
+
+.icon-tab img {
+  width: 16px;
+  height: 16px;
+}
+
 .settings-buttons {
   display: flex;
   flex: none;

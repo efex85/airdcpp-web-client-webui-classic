@@ -30,6 +30,7 @@ import {
   windowType,
 } from './app';
 import {
+  appIconDoc,
   browserCache,
   colorsDoc,
   connectDocs,
@@ -41,6 +42,7 @@ import {
   startupDoc,
   syncAll,
 } from './docs';
+import { showUserIcon } from './appIcon';
 import { showUserColors } from './theme';
 import { resetEmoji } from './emoji';
 import { LiveList } from './live';
@@ -315,16 +317,17 @@ const onAuthenticated = async (response: LoginResponse) => {
 
   save('auth', response.auth_token, 'session');
 
-  // The startup windows and colors are needed before the windows are shown
+  // The startup windows, colors and icon are needed before the windows are shown
   const current = attempt;
   const login = { ...useApp.getState().login, ...response } as LoginResponse;
   connectUserData(login);
-  await patience(Promise.all([startupDoc.sync(), colorsDoc.sync(), emojiDoc.sync()]));
+  await patience(Promise.all([startupDoc.sync(), colorsDoc.sync(), emojiDoc.sync(), appIconDoc.sync()]));
   if (current !== attempt) {
     return;
   }
 
   showUserColors();
+  showUserIcon();
   resetEmoji(); // Packs may have been changed
   startSession(startupDoc.value);
   useApp.setState({ connection: 'connected', login, loginError: null, resuming: false });

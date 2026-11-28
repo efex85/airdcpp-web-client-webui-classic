@@ -1,6 +1,7 @@
 // The data of this UI that is the same on all devices of a user
 
 import { useSyncExternalStore } from 'react';
+import { APP_ICON_DEFAULTS, sanitizeAppIcon, type AppIconSettings } from '../lib/appIcon';
 import { EMOJI_DEFAULTS, sanitizeEmoji, type EmojiSettings } from '../lib/emoji';
 import { merge, mergeText } from '../lib/merge';
 import { sanitizeShortcuts, SHORTCUT_DEFAULTS, type ShortcutSettings } from '../lib/shortcuts';
@@ -45,6 +46,13 @@ export const shortcutsDoc = new SyncedDoc<ShortcutSettings>({
   merge,
 });
 
+export const appIconDoc = new SyncedDoc<AppIconSettings>({
+  key: 'classic_icon',
+  defaults: APP_ICON_DEFAULTS,
+  sanitize: sanitizeAppIcon,
+  merge,
+});
+
 const noteDocs = new Map<string, SyncedDoc<string>>();
 
 interface Connection {
@@ -55,7 +63,7 @@ interface Connection {
 let connection: Connection | null = null;
 let errorHandler: ((error: Error) => void) | null = null;
 
-const fixed = [startupDoc, colorsDoc, widgetsDoc, emojiDoc, shortcutsDoc] as SyncedDoc<any>[];
+const fixed = [startupDoc, colorsDoc, widgetsDoc, emojiDoc, shortcutsDoc, appIconDoc] as SyncedDoc<any>[];
 const allDocs = (): SyncedDoc<any>[] => [...fixed, ...noteDocs.values()];
 
 /** The text of a notes widget */
@@ -95,7 +103,8 @@ export const syncAll = async () => {
     return;
   }
 
-  await Promise.all([startupDoc.sync(), colorsDoc.sync(), emojiDoc.sync(), shortcutsDoc.sync()]);
+  const settings = [startupDoc, colorsDoc, emojiDoc, shortcutsDoc, appIconDoc] as SyncedDoc<any>[];
+  await Promise.all(settings.map((doc) => doc.sync()));
   // The widgets first, so that the text of removed notes isn't restored
   await widgetsDoc.sync();
   await syncNotes();
