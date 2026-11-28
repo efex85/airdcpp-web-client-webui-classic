@@ -1,6 +1,6 @@
 // The Home window: statistics, feeds, notes and recent chats and searches
 import { Activity, EllipsisVertical, History, MessagesSquare, Plus, Rss, StickyNote, X } from 'lucide-react';
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { Direction } from '../../lib/widgetLayout';
 import { useIsMobile } from '../../lib/useIsMobile';
 import { GAP, heightPixels, minUnits, ROW, rowSpan, sizeOf } from '../../lib/widgetSizes';
@@ -34,16 +34,25 @@ interface ContentProps {
   measure: (element: HTMLElement | null) => void;
 }
 
+/** The information scrolls if the box is too low for it; the buttons stay at the bottom of the box */
+const Statistics = ({ active, measure }: Pick<ContentProps, 'active' | 'measure'>) => {
+  const [actions, setActions] = useState<HTMLElement | null>(null);
+  return (
+    <>
+      <div className="widget-scroll">
+        <div ref={measure}>
+          <StatsWidget active={active} actions={actions} />
+        </div>
+      </div>
+      <div className="stats-actions" ref={setActions} />
+    </>
+  );
+};
+
 const Content = ({ widget, title, active, measure }: ContentProps) => {
   switch (widget.type) {
     case 'stats':
-      return (
-        <div className="widget-scroll">
-          <div ref={measure}>
-            <StatsWidget active={active} />
-          </div>
-        </div>
-      );
+      return <Statistics active={active} measure={measure} />;
     case 'rss':
       return <RssWidget widget={widget} active={active} onAddress={(url) => updateWidget(widget.id, { url })} />;
     case 'notes':

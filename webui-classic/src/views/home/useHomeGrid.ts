@@ -36,15 +36,18 @@ export const useHomeGrid = (others: number | undefined) => {
       return;
     }
 
+    const box = statistics.closest('.widget')!;
+    const header = box.querySelector('header')!;
+    const actions = box.querySelector<HTMLElement>('.stats-actions')!;
     const measure = () => {
-      const header = statistics.closest('.widget')!.querySelector('header')!;
       if (statistics.offsetHeight) {
         // With the borders of the box
-        setNeeded(header.offsetHeight + statistics.offsetHeight + 2);
+        setNeeded(header.offsetHeight + statistics.offsetHeight + actions.offsetHeight + 2);
       }
     };
     const observer = new ResizeObserver(measure);
     observer.observe(statistics);
+    observer.observe(actions);
     return () => observer.disconnect();
   }, [statistics]);
 

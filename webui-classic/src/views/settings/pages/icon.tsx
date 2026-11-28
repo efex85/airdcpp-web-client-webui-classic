@@ -1,20 +1,27 @@
 // The icon of the web interface
-import { RotateCcw, Upload } from 'lucide-react';
+import { Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
+import type { IconChoice } from '../../../lib/appIcon';
 import { readIcon } from '../../../lib/readIcon';
 import { withSearch } from '../../../lib/settingsSearch';
-import { standardIcon } from '../../../store/appIcon';
+import { iconPicture } from '../../../store/appIcon';
 import { appIconDoc } from '../../../store/docs';
 import { Note, Page, useDocForm } from '../form';
 import { SyncNote } from './personal';
 
+const CHOICES: [IconChoice, string][] = [
+  ['default', 'AirDC++'],
+  ['dark', 'AirDC++ dark'],
+  ['own', 'Your own picture'],
+];
+
 const AppIcon = () => {
   const form = useDocForm(appIconDoc);
-  const { image } = form.value;
+  const { choice, image } = form.value;
   const [error, setError] = useState('');
   const [reading, setReading] = useState(false);
   const input = useRef<HTMLInputElement>(null);
-  const shown = image || standardIcon();
+  const shown = iconPicture(form.value).src;
 
   const choose = async (file: File | undefined) => {
     if (!file) {
@@ -25,7 +32,7 @@ const AppIcon = () => {
     setError('');
     try {
       const icon = await readIcon(file);
-      form.update((value) => ({ ...value, image: icon }));
+      form.update((value) => ({ ...value, choice: 'own', image: icon }));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -37,7 +44,29 @@ const AppIcon = () => {
     <Page form={form}>
       <SyncNote doc={appIconDoc} />
       <fieldset className="field" data-key="app_icon">
-        <legend>Your own icon</legend>
+        <legend>Icon</legend>
+        <div className="icon-choices">
+          {CHOICES.map(([id, label]) => {
+            const picture = id === 'own' ? image : iconPicture({ choice: id, image }).src;
+            return (
+              <label key={id} className={`icon-choice${picture ? '' : ' missing'}`}>
+                <input
+                  type="radio"
+                  name="app-icon"
+                  value={id}
+                  checked={choice === id}
+                  disabled={!picture || reading}
+                  onChange={() => {
+                    setError('');
+                    form.update((value) => ({ ...value, choice: id }));
+                  }}
+                />
+                {picture ? <img src={picture} alt="" /> : <span className="icon-none" />}
+                <span>{label}</span>
+              </label>
+            );
+          })}
+        </div>
         <div className="icon-preview" aria-label="Preview" role="group">
           <img className="icon-large" src={shown} alt="" />
           <img className="icon-medium" src={shown} alt="" />
@@ -45,7 +74,6 @@ const AppIcon = () => {
             <img src={shown} alt="" />
             AirDC++ Classic
           </span>
-          <span className="muted">{image ? 'Your picture' : 'Standard icon'}</span>
         </div>
         <div className="settings-actions">
           <button type="button" disabled={reading} onClick={() => input.current?.click()}>
@@ -68,10 +96,10 @@ const AppIcon = () => {
             disabled={!image || reading}
             onClick={() => {
               setError('');
-              form.update((value) => ({ ...value, image: '' }));
+              form.update((value) => ({ choice: value.choice === 'own' ? 'default' : value.choice, image: '' }));
             }}
           >
-            <RotateCcw size={12} /> Use the standard icon
+            <Trash2 size={12} /> Remove your picture
           </button>
         </div>
       </fieldset>
@@ -82,9 +110,12 @@ const AppIcon = () => {
       )}
       <Note>
         The icon is shown on the browser tab and with the notifications of the browser, after you press “Save changes”.
-        A square picture looks best; others get see-through borders. It is stored with at most 192 × 192 pixels, and an
-        animated picture becomes a still one. Whether a phone uses it for a shortcut on its home screen depends on the
-        phone's browser, and a shortcut that exists already may keep its old icon.
+        For your own picture a square one looks best; others get see-through borders. It is stored with at most 192 × 192
+        pixels, and an animated picture becomes a still one.
+      </Note>
+      <Note>
+        An app made from this page, such as a web app of Firefox on the Windows taskbar or a shortcut on the home screen
+        of a phone, keeps the icon that it was made with. To change it, remove the app and add it again.
       </Note>
     </Page>
   );
@@ -94,9 +125,9 @@ export const AppIconPage = withSearch(AppIcon, {
   words: 'favicon logo picture image',
   items: [
     {
-      title: 'Your own icon',
-      help: 'Upload a picture for the browser tab',
-      words: 'app favicon',
+      title: 'Icon',
+      help: 'Choose the icon, or upload a picture of your own',
+      words: 'app favicon upload own dark default web app taskbar',
       selector: '[data-key="app_icon"]',
     },
   ],

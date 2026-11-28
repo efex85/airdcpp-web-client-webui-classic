@@ -16,7 +16,7 @@ between devices, the emoticon packs and ADL Search need daemon patches of this i
 | Private messages | including the transport encryption state                                                                                                                           |
 | Search           | type, size and excluded words, hub selection, sources of grouped results, view a file or find the NFO of a folder                                                  |
 | File lists       | folder tree, filter, **Match ADL**, download to favorite folders or any folder, item details, view files, Find NFO, own list per share profile, "Refresh in share" |
-| Viewed files     | text and NFO files, images, audio and video, one window each                                                                                                       |
+| Viewed files     | text and NFO files (with working links), images, audio and video, one window each                                                                                  |
 | Download queue   | priorities, pause and resume all, files and sources of a bundle, remove a user, rescan or force in share after a failed content check, remove completed            |
 | Transfers        | window and optional bottom pane; remove a file or a user from the queue                                                                                            |
 | ADL Search       | searches that are matched against file lists                                                                                                                       |
@@ -70,16 +70,17 @@ changed, depends on the permissions of the web user.
 
 ## Hub title and topic
 
-The title bar of a hub window shows the name of the hub and its topic:
+The title bar of a hub window shows the name of the hub, *AirDC++ | Hub name*. The **topic** is shown at the top of the
+hub chat, just below the toolbar, level with the column headings of the user list.
 
-*AirDC++ | Hub name | Topic*
-
-- The **topic** is the description that the hub sends. A changed topic is shown as soon as the hub sends it, and the
-  last one stays while the hub is disconnected (until the page is reloaded). It is shown as plain text.
-- A title that doesn't fit is cut off. Hover over it to read all of it, or mark it with the mouse to copy it.
+- The topic is the description that the hub sends. A changed topic is shown as soon as the hub sends it, and the last
+  one stays while the hub is disconnected (until the page is reloaded). A hub without a topic has no such line. It is
+  shown as plain text.
+- A topic that doesn't fit is cut off. Hover over it to read all of it, or **click it** to open it over more lines and
+  click again to close it. You can mark it with the mouse to copy it.
 - Hover over the **tab** of a hub to see its address, its connection state and the topic. The lock below the hub
   window shows whether the connection is encrypted.
-- On a **phone** the topic is on a line below the hub name. Tap it to read the whole title, and tap again to close.
+- On a **phone** the topic is at the top of the chat as well. Tap it to read all of it.
 
 ## Home
 
@@ -173,10 +174,11 @@ elsewhere. The buttons keep working.
 ### Hashing and disk space
 
 **Hashing** shows the speed and the time left, the files and the amount of data left, and how far the client has
-come with what is queued. **Pause** takes effect when the current file is done; **Resume** continues. The client
-also pauses hashing by itself while it refreshes the share. **Stop** asks first and then empties the hashing queue;
-a later share refresh adds the files again. The section needs the permission to view the share, and the buttons the
-permission to edit it.
+come with what is queued. Its buttons are at the bottom right of the widget, below the progress bar; they stay
+there in a box that you made higher or lower. **Pause** takes effect when the current file is done; **Resume**
+continues. The client also pauses hashing by itself while it refreshes the share. **Stop** asks first and then
+empties the hashing queue; a later share refresh adds the files again. The section needs the permission to view the
+share, and the buttons the permission to edit it.
 
 **Disk space** shows the free and total space for the download folder and the shared folders (the latter with the
 permission to view the share). The bar turns red when less than a tenth is free. The client doesn't tell which disk
@@ -264,8 +266,9 @@ written as the character itself. On NMDC hubs such characters get lost unless th
 
 ## App icon
 
-**Settings → View → App icon** replaces the icon of the web UI with a picture of your own. Press
-**Upload a picture…**, check the preview and press **Save changes**. **Use the standard icon** goes back.
+**Settings → View → App icon** chooses the icon of the web UI: **AirDC++** (the coloured one, which is used until you
+choose another), **AirDC++ dark**, or **Your own picture** after **Upload a picture…**. Check the preview and press
+**Save changes**. Your picture is kept while another icon is chosen, until you press **Remove your picture**.
 
 - The icon is shown on the browser tab and with the notifications of the browser, also on the login page of a browser
   that you have used before.
@@ -273,8 +276,20 @@ written as the character itself. On NMDC hubs such characters get lost unless th
 - Pictures that the browser can show work, such as PNG, JPG, SVG, GIF, WebP and ICO, up to 10 MB. A square one looks
   best; others get see-through borders. It is stored as a PNG of at most 192 × 192 pixels, and an animated picture
   becomes a still one.
-- The icon is also offered to phones for a shortcut on their home screen. Whether one uses it depends on its browser,
-  and a shortcut that exists already may keep its old icon.
+
+### As an app with its own window
+
+The page describes itself to the browser with a *web app manifest* that names the web UI and the chosen icon, and offers
+the icon for the home screen of Apple devices. Browsers use these when you add the web UI as an app, such as a web app
+of Firefox on the Windows taskbar or a shortcut on the home screen of a phone.
+
+- Add the app after you have logged in and saved your choice.
+- An app keeps the icon that it was made with. To change it, remove the app and add it again. In Firefox, click the
+  web app button in the address bar of the app's only window: this moves the page back into Firefox and removes the app.
+  Reload the page there, and add it to the taskbar again. This also applies to an app that was made with an earlier
+  version of this web UI or with the official one.
+- How the browsers use the manifest differs. It was checked with Chromium; for Firefox it follows the published source
+  of Firefox.
 
 ## Synced and per browser
 
@@ -404,6 +419,20 @@ needs a client that supports this kind of search.
 - The audio and video players get the file from an address that contains the login token of the session, as in the
   official web UI. Keep that in mind if a reverse proxy writes full addresses to its log.
 - The web user needs the permission to view files.
+
+### Links in text files
+
+Addresses in a viewed text or NFO file are links. The text itself is shown exactly as written, so that drawings
+stay in line.
+
+- Addresses that start with `http://`, `https://`, `ftp://` or `www.` open in a new browser tab. So do addresses
+  without them when they have a path and a common ending, such as `imdb.com/title/tt0111161/`.
+- A hub address (`adc://`, `adcs://`, `dchub://`, `nmdcs://`) connects to the hub.
+- A magnet link opens the same menu as one in a chat.
+- Mail addresses and other kinds of addresses stay plain text, and so does an address that is split over two lines
+  (only its first part becomes a link).
+
+The files are written by other people, so look at an address before you open it.
 
 ## Download queue
 

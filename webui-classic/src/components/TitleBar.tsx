@@ -1,5 +1,5 @@
 // The title bar of large screens: the name of the program and the title of the shown window, as a desktop client
-// writes them. Hub windows have a title of their own, with the topic of the hub.
+// writes them. Hub windows have a title of their own, as the Windows client writes it.
 import { windowInfo } from '../lib/windows';
 import { useApp } from '../store/app';
 

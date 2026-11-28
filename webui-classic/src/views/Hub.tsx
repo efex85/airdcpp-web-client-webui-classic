@@ -4,7 +4,9 @@ import { hubMenu, reconnectHub } from '../actions';
 import type { HubSession, OnlineUser } from '../api/types';
 import { ChatView } from '../components/ChatView';
 import { Splitter } from '../components/Splitter';
+import { TopicBar } from '../components/TopicBar';
 import { formatSize } from '../lib/format';
+import { hubTopic } from '../lib/hubTitle';
 import { load, save } from '../lib/storage';
 import { useIsMobile } from '../lib/useIsMobile';
 import { reportError, useApp } from '../store/app';
@@ -100,16 +102,20 @@ export const Hub = ({ id, active }: { id: number; active: boolean }) => {
     return <div className="view-empty">The hub has been closed</div>;
   }
 
+  const topic = hubTopic(hub);
   const chat = (
-    <ChatView
-      sessionKey={`hub:${id}`}
-      path={path}
-      messages={messages}
-      hubId={id}
-      nicks={() => users.map((u) => u.nick)}
-      disabled={hub.connect_state.id !== 'connected'}
-      active={active && (!mobile || pane === 'chat')}
-    />
+    <div className="hub-chat">
+      {topic && <TopicBar topic={topic} />}
+      <ChatView
+        sessionKey={`hub:${id}`}
+        path={path}
+        messages={messages}
+        hubId={id}
+        nicks={() => users.map((u) => u.nick)}
+        disabled={hub.connect_state.id !== 'connected'}
+        active={active && (!mobile || pane === 'chat')}
+      />
+    </div>
   );
   const userList = <UserList hubId={id} users={users} />;
 

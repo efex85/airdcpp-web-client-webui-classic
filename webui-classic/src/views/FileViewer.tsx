@@ -1,9 +1,10 @@
-// Shows a file opened for viewing: text (NFO), image, audio or video
+// Shows a file opened for viewing: text (NFO, with working links), image, audio or video
 import { Copy } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { copyText } from '../actions';
 import { getBasePath } from '../api/socket';
 import type { ViewFile } from '../api/types';
+import { LinkedText } from '../components/LinkedText';
 import { formatDate } from '../lib/format';
 import { load, save } from '../lib/storage';
 import { decodeText, type ViewKind } from '../lib/viewFile';
@@ -105,7 +106,7 @@ const TextContent = ({ file }: { file: ViewFile }) => {
         </button>
       </div>
       <pre className={`viewer-text${wrap ? ' wrap' : ''}`} tabIndex={0}>
-        {text}
+        <LinkedText text={text} />
       </pre>
     </>
   );

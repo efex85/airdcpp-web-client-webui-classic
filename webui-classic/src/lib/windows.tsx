@@ -19,17 +19,15 @@ import {
 import type { ReactNode } from 'react';
 import { windowId, windowType, type AppState } from '../store/app';
 import { colorsDoc } from '../store/docs';
-import { hubCaption, hubTooltip, hubTopic } from './hubTitle';
+import { hubCaption, hubTooltip } from './hubTitle';
 import { currentTabEvent, type TabEventId, type TabHighlights } from './tabEvents';
 
 export type Attention = 'mention' | 'unread' | null;
 
 export interface WindowInfo {
   title: string;
-  /** Hubs: the full title, with the topic */
+  /** Hubs: the title bar, instead of the usual one */
   caption?: string;
-  /** Hubs: the topic */
-  topic?: string;
   icon: ReactNode;
   attention: Attention;
   /** Chats: what has happened, which decides how the tab looks */
@@ -73,7 +71,6 @@ export const windowInfo = (
       return {
         title: hub?.identity.name || hub?.hub_url || 'Hub',
         caption: hub && hubCaption(hub),
-        topic: hub && hubTopic(hub),
         detail: hub && hubTooltip(hub),
         icon: <Server size={ICON} className={`i-hub ${hub?.connect_state.id ?? ''}`} />,
         attention: event?.level ?? null,

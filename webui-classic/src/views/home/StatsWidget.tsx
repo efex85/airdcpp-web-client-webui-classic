@@ -43,7 +43,7 @@ const Row = ({ title, children }: { title: string; children: ReactNode }) => (
   </tr>
 );
 
-export const StatsWidget = ({ active }: { active: boolean }) => {
+export const StatsWidget = ({ active, actions }: { active: boolean; actions: HTMLElement | null }) => {
   const access = useAccess();
   const system = useApp((s) => s.login?.system_info);
   const generation = useApp((s) => s.generation);
@@ -184,7 +184,7 @@ export const StatsWidget = ({ active }: { active: boolean }) => {
         </table>
       )}
       <DiskStats active={active} held={held} />
-      {access('share_view') && <HashingStats active={active} held={held} />}
+      {access('share_view') && <HashingStats active={active} held={held} actions={actions} />}
     </div>
   );
 };

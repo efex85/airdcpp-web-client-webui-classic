@@ -174,7 +174,7 @@ textarea[aria-invalid='true'] {
   user-select: none;
 }
 
-/* The name of the program and the title of the shown window, with the topic of a hub */
+/* The name of the program and the title of the shown window */
 .titlebar {
   flex: none;
   overflow: hidden;
@@ -182,7 +182,7 @@ textarea[aria-invalid='true'] {
   background: var(--chrome);
   white-space: nowrap;
   text-overflow: ellipsis;
-  /* The topic can be marked and copied */
+  /* The name of a hub can be marked and copied */
   -webkit-user-select: text;
   user-select: text;
 }
@@ -546,6 +546,14 @@ textarea[aria-invalid='true'] {
 .viewer-text.wrap {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* A link takes the place of the characters it is made of, so that drawings stay in line */
+.viewer-text button.link {
+  white-space: inherit;
+  overflow-wrap: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
 }
 
 .viewer-image,
@@ -961,6 +969,48 @@ textarea[aria-invalid='true'] {
 .chat {
   display: flex;
   flex-direction: column;
+}
+
+.hub-chat {
+  display: flex;
+  flex-direction: column;
+}
+
+.hub-chat > .chat {
+  flex: 1;
+  min-height: 0;
+}
+
+/* As high as the head of the user list next to it */
+.hub-topic {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: calc(22px * var(--font-scale));
+  padding: 0 6px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.hub-topic > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.hub-topic.open {
+  align-items: flex-start;
+  height: auto;
+  max-height: 30vh;
+  padding-block: 3px;
+  overflow-y: auto;
+}
+
+.hub-topic.open > span {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .chat-log {
@@ -2067,6 +2117,42 @@ fieldset.field {
 }
 
 /* The chosen icon in the sizes that browsers and phones show it in */
+.icon-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.icon-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 8px;
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+}
+
+.icon-choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--chrome);
+}
+
+.icon-choice.missing {
+  color: var(--muted);
+  cursor: default;
+}
+
+.icon-choice img,
+.icon-none {
+  width: 32px;
+  height: 32px;
+}
+
+.icon-none {
+  border: 1px dashed var(--border-strong);
+}
+
 .icon-preview {
   display: flex;
   flex-wrap: wrap;
@@ -2745,11 +2831,34 @@ textarea.notes {
   font-size: inherit;
 }
 
-.stat-block button {
+/* Pause and Stop of the hashing, at the bottom of System information */
+.stats-actions {
+  flex: none;
+}
+
+.stats-actions > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 10px 7px;
+}
+
+.stats-actions button {
   display: inline-flex;
   flex: none;
   align-items: center;
   gap: 4px;
+}
+
+/* Directly under the progress bar */
+.widget-scroll:has(+ .stats-actions > div) .home-stats {
+  padding-bottom: 5px;
+}
+
+/* Room for the corners */
+.sized .stats-actions > div {
+  padding-inline: 15px;
 }
 
 .disk + .disk {
@@ -3143,41 +3252,6 @@ textarea.notes {
     text-overflow: ellipsis;
   }
 
-  /* A hub with a topic: the title is a button */
-  .topbar button.topbar-title {
-    justify-content: flex-start;
-    min-height: 40px;
-    padding: 0;
-    background: none;
-    border: 0;
-    text-align: left;
-  }
-
-  .topbar-names {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-width: 0;
-    line-height: 1.25;
-  }
-
-  .topbar-topic {
-    color: var(--muted);
-    font-size: calc(12px * var(--font-scale));
-    font-weight: normal;
-  }
-
-  .topbar-caption {
-    flex-basis: 100%;
-    max-height: 30vh;
-    overflow: auto;
-    padding: 2px 6px 4px;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    -webkit-user-select: text;
-    user-select: text;
-  }
-
   .dot {
     position: absolute;
     top: 6px;
@@ -3285,6 +3359,11 @@ textarea.notes {
 
   .chat-log {
     font-size: calc(13.5px * var(--font-scale) * var(--chat-scale));
+  }
+
+  /* Room for a finger */
+  .hub-topic:not(.open) {
+    height: calc(30px * var(--font-scale));
   }
 
   .view.search {

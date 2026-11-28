@@ -15,14 +15,10 @@ const hub = (changes: Partial<HubSession> = {}, description = 'Welcome'): HubSes
 });
 
 describe('the title of a hub window', () => {
-  it('has the program, the name and the topic', () => {
-    expect(hubCaption(hub())).toBe('AirDC++ | Hub | Welcome');
+  it('has the program and the name; the topic is shown above the chat', () => {
+    expect(hubCaption(hub())).toBe('AirDC++ | Hub');
     // Neither the encryption nor the address is a part of it
-    expect(hubCaption(hub({ encryption: null, hub_url: 'adc://hub.example:411' }))).toBe('AirDC++ | Hub | Welcome');
-  });
-
-  it('leaves out a topic that the hub has not got', () => {
-    expect(hubCaption(hub({}, ''))).toBe('AirDC++ | Hub');
+    expect(hubCaption(hub({ encryption: null, hub_url: 'adc://hub.example:411' }))).toBe('AirDC++ | Hub');
   });
 
   it('uses the address for a hub without a name', () => {
@@ -43,7 +39,7 @@ describe('the title of a hub window', () => {
       connect_state: { id: 'disconnected', str: 'Disconnected' },
       encryption: null,
     };
-    expect(hubCaption(offline)).toBe('AirDC++ | Hub | Welcome');
+    expect(hubTopic(offline)).toBe('Welcome');
     expect(hubTooltip(offline)).toBe('adcs://hub.example:411: Disconnected\nTopic: Welcome');
     // Connected again: the hub has removed its topic
     expect(hubTopic({ ...online, identity: { name: 'Hub', description: '' } })).toBe('');

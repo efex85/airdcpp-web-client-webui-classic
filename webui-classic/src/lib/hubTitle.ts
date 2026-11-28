@@ -1,4 +1,4 @@
-// The title of a hub window, "AirDC++ | Name | Topic", and the text shown when hovering over its tab
+// The title of a hub window, "AirDC++ | Name", its topic and the text shown when hovering over its tab
 
 import type { HubSession } from '../api/types';
 
@@ -15,9 +15,8 @@ export const hubTopic = (hub: HubSession): string => {
   return hub.connect_state.id === 'connected' ? '' : (topics.get(hub.id) ?? '');
 };
 
-/** The title bar; a hub without a name is shown by its address */
-export const hubCaption = (hub: HubSession): string =>
-  ['AirDC++', hub.identity.name || hub.hub_url, hubTopic(hub)].filter(Boolean).join(' | ');
+/** The title bar; a hub without a name is shown by its address. The topic is shown above the chat. */
+export const hubCaption = (hub: HubSession): string => `AirDC++ | ${hub.identity.name || hub.hub_url}`;
 
 export const hubTooltip = (hub: HubSession): string => {
   const state = `${hub.hub_url}: ${hub.connect_state.str}`;

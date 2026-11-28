@@ -11,17 +11,18 @@ import { isHubLink, isSafeLink, parseMagnet, splitHighlights, type Magnet } from
 import { openMenu, type MenuPosition } from '../store/ui';
 import { EmojiView } from './Emoji';
 
-const magnetMenu = (
+/** The menu of a magnet link. A link of a chat message has more details than one found in a file. */
+export const magnetMenu = (
   position: MenuPosition,
   url: string,
   magnet: Magnet,
-  highlight: Highlight,
+  highlight?: Highlight,
   user?: HintedUser,
 ) => {
   const file = {
     ...magnet,
-    type: { id: 'file' as const, content_type: highlight.content_type ?? '', str: '' },
-    dupe: highlight.dupe as Dupe | null,
+    type: { id: 'file' as const, content_type: highlight?.content_type ?? '', str: '' },
+    dupe: (highlight?.dupe ?? null) as Dupe | null,
   };
   // The sender is a source for the file, unless it's us or the user has left
   const source = user && !user.flags.includes('self') && !user.flags.includes('offline') ? user : undefined;
