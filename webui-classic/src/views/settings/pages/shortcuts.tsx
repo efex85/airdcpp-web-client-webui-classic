@@ -1,6 +1,7 @@
 // Which keys and mouse buttons do what
 import { RotateCcw, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { needsHistoryButtons, recordHistoryButton } from '../../../lib/historyButtons';
 import { isMac } from '../../../lib/platform';
 import { withSearch } from '../../../lib/settingsSearch';
 import {
@@ -40,6 +41,17 @@ const Recorder = ({ label, keys, disabled, onKeys, onButton, onMessage }: Record
     setRecording(false);
     onMessage('');
   };
+
+  // A button that the browser answers by going back or forward in its history
+  useEffect(
+    () =>
+      recording
+        ? recordHistoryButton((button) => {
+            stop();
+            onButton(button);
+          })
+        : undefined,
+  );
 
   return (
     <button
@@ -196,6 +208,13 @@ const Shortcuts = () => {
         To change the keys of a shortcut, click them and press the new ones. A thumb button that has a shortcut no
         longer goes back or forward in the history of the browser.
       </Note>
+      {needsHistoryButtons(navigator.userAgent) && (
+        <Note>
+          This version of Firefox doesn’t tell web pages about the thumb buttons; it only goes back or forward.
+          Anything that makes it do that, including the arrows in its toolbar, therefore uses these shortcuts. Click or
+          type something in the page once after opening it.
+        </Note>
+      )}
       <Section title="Shortcuts">
         <div className="shortcuts">
           {SHORTCUT_ACTIONS.map((action) => (

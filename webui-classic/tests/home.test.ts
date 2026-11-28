@@ -2,7 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { CONFLICT_MARKER, equal, merge, mergeText } from '../src/lib/merge';
 import { sanitizeStartup, startupTabs } from '../src/lib/startup';
 import { rememberWindow, windowAfterClose } from '../src/lib/windowHistory';
-import { createWidget, DEFAULT_WIDGETS, moveWidget, newWidgetId, sanitizeWidgets, setWidgetRows } from '../src/lib/widgets';
+import { createWidget, DEFAULT_WIDGETS, moveWidget, newWidgetId, sanitizeWidgets } from '../src/lib/widgets';
+import {
+  columnCount,
+  heightPixels,
+  isNormalSize,
+  minUnits,
+  normalHeight,
+  rowSpan,
+  sanitizeSizes,
+  sizeOf,
+  snapHeight,
+  widthUnits,
+} from '../src/lib/widgetSizes';
 import type { HashStats } from '../src/api/settingsTypes';
 import { diskFolderNames, diskIsLow, diskUsedPercent, groupDisks } from '../src/lib/disks';
 import { hashingBusy, hashingProgress, hashingStatus, hashingText } from '../src/lib/hashing';
@@ -121,7 +133,6 @@ describe('widgets', () => {
   it('keeps one list of recent private chats and one of recent searches', () => {
     const saved = ['pms', 'pms', 'searches', 'searches'].map((type, i) => ({ id: `w${i}`, type }));
     expect(sanitizeWidgets({ list: saved }).list.map((w) => w.id)).toEqual(['w0', 'w2']);
-    expect(setWidgetRows(sanitizeWidgets({ list: saved }).list, 'w0', 2)[0]!.rows).toBe(2);
   });
 
   it('uses the defaults if nothing sensible is stored', () => {
@@ -161,21 +172,61 @@ describe('formatting', () => {
   });
 });
 
-describe('widget heights', () => {
-  const list = [createWidget('stats', 'stats'), createWidget('rss', 'a'), createWidget('notes', 'b')];
+describe('widget sizes', () => {
+  const [stats, feed] = [createWidget('stats', 'stats'), createWidget('rss', 'a')];
 
-  it('makes feeds and notes taller and normal again', () => {
-    const tall = setWidgetRows(list, 'a', 2);
-    expect(tall.map((w) => w.rows)).toEqual([undefined, 2, undefined]);
-    expect(setWidgetRows(tall, 'a', 1)).toEqual(list);
-    expect('rows' in setWidgetRows(tall, 'a', 1)[1]!).toBe(false);
+  it('has four width steps for every box that fits side by side', () => {
+    expect([200, 380, 767, 768, 1155, 1156].map(columnCount)).toEqual([4, 4, 4, 8, 8, 12]);
   });
 
-  it('keeps the statistics one row high', () => {
-    expect(setWidgetRows(list, 'stats', 2)).toEqual(list);
+  it('keeps heights in whole rows, with the space below the box', () => {
+    expect(snapHeight(340)).toBe(342);
+    expect((snapHeight(347) + 8) % 10).toBe(0);
+    expect(snapHeight(10)).toBe(112);
+    expect(snapHeight(99999)).toBe(3992);
+    expect(rowSpan(342)).toBe(35);
+    // The normal height never gets smaller than what's needed
+    expect(normalHeight(340)).toBe(342);
+    expect(normalHeight(343)).toBe(352);
   });
 
-  it('keeps saved heights and drops unusable ones', () => {
+  it('makes a box that is too wide as wide as the window', () => {
+    expect(widthUnits({}, 12)).toBe(4);
+    expect(widthUnits({ w: 10 }, 12)).toBe(10);
+    expect(widthUnits({ w: 10 }, 4)).toBe(4);
+    expect(widthUnits({ w: 2 }, 12)).toBe(2);
+    expect(widthUnits({ w: 2 }, 12, minUnits('stats'))).toBe(3);
+    expect(widthUnits({ w: 2 }, 12, minUnits('notes'))).toBe(2);
+  });
+
+  it('gives preset heights in normal boxes, and own heights in pixels', () => {
+    expect(heightPixels({}, 342)).toBe(342);
+    expect(heightPixels({ rows: 2 }, 342)).toBe(692);
+    expect(heightPixels({ rows: 3 }, 342)).toBe(1042);
+    expect(heightPixels({ h: 202, w: 6 }, 342)).toBe(202);
+    expect(isNormalSize({})).toBe(true);
+    expect(isNormalSize({ rows: 1 })).toBe(true);
+    expect(isNormalSize({ w: 4 })).toBe(false);
+  });
+
+  it('starts with the height that was saved for all devices until the browser has its own', () => {
+    const tall = { ...feed, rows: 2 };
+    expect(sizeOf({}, tall)).toEqual({ rows: 2 });
+    expect(sizeOf({ a: {} }, tall)).toEqual({});
+    expect(sizeOf({ a: { w: 6 } }, tall)).toEqual({ w: 6 });
+    expect(sizeOf({}, stats)).toEqual({});
+  });
+
+  it('drops unusable stored sizes', () => {
+    expect(sanitizeSizes(null)).toEqual({});
+    expect(sanitizeSizes([1])).toEqual({});
+    expect(sanitizeSizes({ a: { w: 6.4, h: '300', rows: 9, x: 1 }, b: 5, c: { h: NaN } })).toEqual({
+      a: { w: 6, rows: 3 },
+      c: {},
+    });
+  });
+
+  it('keeps heights saved by earlier versions and drops unusable ones', () => {
     const saved = [
       { id: 'a', type: 'rss', rows: 3 },
       { id: 'b', type: 'notes', rows: 2 },
@@ -184,15 +235,6 @@ describe('widget heights', () => {
       { id: 'stats', type: 'stats', rows: 2 },
     ];
     expect(sanitizeWidgets({ list: saved }).list.map((w) => w.rows)).toEqual([3, 2, undefined, undefined, undefined]);
-  });
-
-  it('combines a height set on one device with a change made on another', () => {
-    const base = { list };
-    const mine = { list: setWidgetRows(list, 'a', 2) };
-    const theirs = { list: list.map((w) => (w.id === 'a' ? { ...w, title: 'News' } : w)) };
-    expect(merge(base, mine, theirs).list[1]).toMatchObject({ rows: 2, title: 'News' });
-    // Back to normal on this device, unchanged on the other one
-    expect(merge(mine, base, mine).list[1]!.rows).toBeUndefined();
   });
 });
 

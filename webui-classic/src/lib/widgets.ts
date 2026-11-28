@@ -12,7 +12,7 @@ export interface Widget {
   url: string;
   /** A feed is loaded again when it's older than this (RSS widgets) */
   refresh_minutes: number;
-  /** Widgets that are made taller fill this many rows of the window (missing: one) */
+  /** A taller height that earlier versions saved for all devices; see lib/widgetSizes */
   rows?: number;
 }
 
@@ -40,19 +40,8 @@ export const WIDGET_HEIGHTS: [rows: number, name: string][] = [
   [3, 'Extra tall (3 boxes)'],
 ];
 
-/** The statistics are always one row high */
 const validRows = (type: WidgetType, rows: unknown): rows is number =>
   type !== 'stats' && WIDGET_HEIGHTS.some(([value]) => value > 1 && value === rows);
-
-export const setWidgetRows = (list: Widget[], id: string, rows: number): Widget[] =>
-  list.map((widget) => {
-    if (widget.id !== id) {
-      return widget;
-    }
-
-    const { rows: _, ...normal } = widget;
-    return validRows(widget.type, rows) ? { ...normal, rows } : normal;
-  });
 
 export const createWidget = (type: WidgetType, id: string, values: Partial<Widget> = {}): Widget => ({
   title: '',

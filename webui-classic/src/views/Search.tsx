@@ -345,6 +345,7 @@ export const SearchView = ({ tabKey, active }: { tabKey: string; active: boolean
     <DataTable
       id="search"
       label="Search results"
+      fitNames
       columns={COLUMNS}
       items={results}
       itemKey={(r) => r.id}
