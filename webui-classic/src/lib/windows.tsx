@@ -7,6 +7,7 @@ import {
   Folder,
   House,
   Image,
+  ListFilter,
   MessageSquare,
   Music,
   ScrollText,
@@ -18,7 +19,7 @@ import {
 import type { ReactNode } from 'react';
 import { windowId, windowType, type AppState } from '../store/app';
 import { colorsDoc } from '../store/docs';
-import { hubCaption, hubTopic } from './hubTitle';
+import { hubCaption, hubTooltip, hubTopic } from './hubTitle';
 import { currentTabEvent, type TabEventId, type TabHighlights } from './tabEvents';
 
 export type Attention = 'mention' | 'unread' | null;
@@ -64,6 +65,8 @@ export const windowInfo = (
       return { title: 'Settings', icon: <Settings size={ICON} />, attention: null };
     case 'transfers':
       return { title: 'Transfers', icon: <ArrowDownUp size={ICON} className="i-up" />, attention: null };
+    case 'adl':
+      return { title: 'ADL Search', icon: <ListFilter size={ICON} className="i-search" />, attention: null };
     case 'hub': {
       const hub = state.hubs.find((h) => String(h.id) === id);
       const event = currentTabEvent('hub', hub?.message_counts.unread, highlight);
@@ -71,7 +74,7 @@ export const windowInfo = (
         title: hub?.identity.name || hub?.hub_url || 'Hub',
         caption: hub && hubCaption(hub),
         topic: hub && hubTopic(hub),
-        detail: hub && `${hub.hub_url}: ${hub.connect_state.str}`,
+        detail: hub && hubTooltip(hub),
         icon: <Server size={ICON} className={`i-hub ${hub?.connect_state.id ?? ''}`} />,
         attention: event?.level ?? null,
         event: event?.id,

@@ -5,6 +5,7 @@ import {
   FolderOpen,
   FolderSync,
   House,
+  ListFilter,
   RefreshCw,
   ScrollText,
   Search,
@@ -108,6 +109,12 @@ export const Toolbar = () => {
         icon={<Download size={size} className="i-down" />}
         pressed={active === 'queue'}
         onClick={() => showWindow('queue')}
+      />
+      <Button
+        title="ADL Search"
+        icon={<ListFilter size={size} className="i-search" />}
+        pressed={active === 'adl'}
+        onClick={() => showWindow('adl')}
       />
       <Button
         title="Show the transfer pane"

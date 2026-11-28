@@ -3615,3 +3615,98 @@ textarea.notes {
     min-width: 0;
   }
 }
+
+/* ADL Search */
+
+.adl-options {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  padding: 5px 8px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--border);
+}
+
+.view-buttons.adl-buttons {
+  flex-wrap: wrap;
+}
+
+.adl-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.adl-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.adl-off .cell,
+.adl-off .row-title,
+.adl-off .row-detail {
+  color: var(--muted);
+}
+
+fieldset.adl-sizes {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.adl-sizes legend {
+  margin-bottom: 4px;
+  padding: 0;
+}
+
+.adl-sizes label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.adl-sizes input,
+.adl-sizes select {
+  width: 100%;
+  min-width: 0;
+}
+
+.adl-test-result {
+  min-height: 1.4em;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.adl-test-result.ok {
+  color: var(--dupe-shared);
+}
+
+/* Result folders in a file list */
+.tr.adl-result .cell,
+.tr.adl-result .row-title,
+.tree-row.adl .tree-name {
+  color: var(--dupe-finished);
+}
+
+.path-bar button.match-adl {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  width: auto;
+  white-space: nowrap;
+}
+
+/* A phone has no room for both words next to the path */
+@media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
+  .path-bar button.match-adl .match-word {
+    display: none;
+  }
+}

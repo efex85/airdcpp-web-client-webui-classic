@@ -15,7 +15,8 @@ export type Permission =
   | 'filelists_view'
   | 'view_file_edit'
   | 'queue_edit'
-  | 'search';
+  | 'search'
+  | 'download';
 
 export const permits = (permissions: string[] | undefined, permission: Permission): boolean =>
   !!permissions && (permissions.includes('admin') || permissions.includes(permission));

@@ -114,6 +114,7 @@ export const viewMenu = (): MenuEntry[] => [
   { label: 'Favorite hubs', keys: activeKeys('favorites'), onClick: () => showWindow('favorites') },
   { label: 'Download queue', keys: activeKeys('queue'), onClick: () => showWindow('queue') },
   { label: 'Transfers', keys: activeKeys('transfers'), onClick: () => showWindow('transfers') },
+  { label: 'ADL Search', keys: activeKeys('adl'), onClick: () => showWindow('adl') },
   { label: 'New search', keys: activeKeys('search'), onClick: () => openSearch() },
   'separator',
   {

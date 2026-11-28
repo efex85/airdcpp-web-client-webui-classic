@@ -1,4 +1,4 @@
-// The title of a hub window, written as the Windows client writes it: "[S] Name - Topic (address)"
+// The title of a hub window, "AirDC++ | Name | Topic", and the text shown when hovering over its tab
 
 import type { HubSession } from '../api/types';
 
@@ -15,9 +15,12 @@ export const hubTopic = (hub: HubSession): string => {
   return hub.connect_state.id === 'connected' ? '' : (topics.get(hub.id) ?? '');
 };
 
-export const hubCaption = (hub: HubSession): string => {
-  // Encrypted, with a certificate that is [S]ecure or [U]ntrusted
-  const security = !hub.encryption ? '' : hub.encryption.trusted ? '[S] ' : '[U] ';
+/** The title bar; a hub without a name is shown by its address */
+export const hubCaption = (hub: HubSession): string =>
+  ['AirDC++', hub.identity.name || hub.hub_url, hubTopic(hub)].filter(Boolean).join(' | ');
+
+export const hubTooltip = (hub: HubSession): string => {
+  const state = `${hub.hub_url}: ${hub.connect_state.str}`;
   const topic = hubTopic(hub);
-  return `${security}${hub.identity.name || hub.hub_url}${topic ? ` - ${topic}` : ''} (${hub.hub_url})`;
+  return topic ? `${state}\nTopic: ${topic}` : state;
 };

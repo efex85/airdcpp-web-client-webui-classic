@@ -141,6 +141,32 @@ export interface FilelistItem {
   tth: string;
   dupe: Dupe | null;
   complete: boolean;
+  /** Result folders of ADL Search and what they hold; the path is that of the matched item, '' for result folders */
+  adl?: { path: string } | null;
+}
+
+export type AdlSourceType = 'file' | 'directory' | 'full_path';
+export type AdlSizeUnit = 'B' | 'KiB' | 'MiB' | 'GiB';
+
+export interface AdlSearch {
+  pattern: string;
+  regex: boolean;
+  source_type: AdlSourceType;
+  destination: string;
+  /** -1 for no limit */
+  min_size: number;
+  max_size: number;
+  size_unit: AdlSizeUnit;
+  comment: string;
+  active: boolean;
+  /** Matching files are added to the queue */
+  download: boolean;
+}
+
+export interface AdlState {
+  revision: number;
+  searches: AdlSearch[];
+  settings: { match_full_lists: boolean; break_on_first: boolean };
 }
 
 export interface FilelistSession {

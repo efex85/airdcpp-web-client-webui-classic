@@ -132,6 +132,32 @@ export const browseUser = async (user: HintedUser, directory = '/') => {
   }
 };
 
+/** Opens the full file list of a user, also if only a part of it is open */
+export const browseFullList = async (user: HintedUser) => {
+  const open = () => openTab(`filelist:${user.cid}`);
+  try {
+    const list = await socket.post<FilelistSession>('filelists', {
+      user: { cid: user.cid, hub_url: user.hub_url },
+      directory: '/',
+      full: true,
+    });
+    useApp.setState((s) => ({
+      filelists: s.filelists.some((l) => l.id === list.id) ? s.filelists : [...s.filelists, list],
+    }));
+    open();
+  } catch (e) {
+    if ((e as ApiError).code !== 409) {
+      reportError('Get full file list')(e);
+      return;
+    }
+
+    open();
+    if (useApp.getState().filelists.find((l) => l.id === user.cid)?.partial_list) {
+      await socket.post(`filelists/${user.cid}/full_list`).catch(reportError('Get full file list'));
+    }
+  }
+};
+
 /** What a double click on a user does: bots have no files, so they get a private chat */
 export const openUser = (user: HintedUser) =>
   user.flags.includes('bot') ? openPrivateChat(user) : browseUser(user);
@@ -211,6 +237,7 @@ export const userMenu = (user: HintedUser): MenuEntry[] => {
   // The entry in bold is what a double click does
   return [
     { label: 'Get file list', bold: !bot, disabled: offline || self, onClick: () => void browseUser(user) },
+    { label: 'Get full file list', disabled: offline || self, onClick: () => void browseFullList(user) },
     { label: 'Send private message', bold: bot, disabled: offline || self, onClick: () => void openPrivateChat(user) },
     { label: 'Match queue', disabled: offline || self, onClick: () => void matchQueue(user) },
     'separator',
@@ -328,7 +355,7 @@ export const closeWindow = async (key: string) => {
   }
 };
 
-export const showWindow = (key: 'home' | 'syslog' | 'favorites' | 'queue' | 'transfers') => {
+export const showWindow = (key: 'home' | 'syslog' | 'favorites' | 'queue' | 'transfers' | 'adl') => {
   openTab(key);
   activate(key);
 };

@@ -3,25 +3,26 @@
 The web UI of this image: a UI for [AirDC++ Web Client](https://airdcpp-web.github.io/) that looks and works like a
 classic desktop DC client: menu bar, toolbar, window tabs at the bottom, sortable lists with right-click menus, a transfer
 pane and a status bar. Dark theme. It talks to the daemon through its Web API; the system uptime, the syncing
-between devices and the emoticon packs need three small daemon patches of this image (see the
+between devices, the emoticon packs and ADL Search need daemon patches of this image (see the
 [main README](../README.md), which also describes its other daemon changes).
 
 ## What is included
 
-| Window           | Highlights                                                                                                                                              |
-|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Home             | system information, RSS feeds and notes                                                                                                                 |
-| Hubs             | chat with clickable magnet, release and web links, Tab nick completion, chat commands; password and redirect prompts                                    |
-| User list        | operators/bots/users groups, column sorting and selection, filter, hub user commands                                                                    |
-| Private messages | including the transport encryption state                                                                                                                |
-| Search           | type, size and excluded words, hub selection, sources of grouped results, view a file or find the NFO of a folder                                       |
-| File lists       | folder tree, filter, download to favorite folders or any folder, item details, view files, Find NFO, own list per share profile, "Refresh in share"     |
-| Viewed files     | text and NFO files, images, audio and video, one window each                                                                                            |
-| Download queue   | priorities, pause and resume all, files and sources of a bundle, remove a user, rescan or force in share after a failed content check, remove completed |
-| Transfers        | window and optional bottom pane; remove a file or a user from the queue                                                                                 |
-| Favorite hubs    | add, connect and edit favorite hubs                                                                                                                     |
-| System log       |                                                                                                                                                         |
-| Settings         | see below                                                                                                                                               |
+| Window           | Highlights                                                                                                                                                         |
+|------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Home             | system information, RSS feeds and notes                                                                                                                            |
+| Hubs             | chat with clickable magnet, release and web links, Tab nick completion, chat commands; password and redirect prompts                                               |
+| User list        | operators/bots/users groups, column sorting and selection, filter, hub user commands                                                                               |
+| Private messages | including the transport encryption state                                                                                                                           |
+| Search           | type, size and excluded words, hub selection, sources of grouped results, view a file or find the NFO of a folder                                                  |
+| File lists       | folder tree, filter, **Match ADL**, download to favorite folders or any folder, item details, view files, Find NFO, own list per share profile, "Refresh in share" |
+| Viewed files     | text and NFO files, images, audio and video, one window each                                                                                                       |
+| Download queue   | priorities, pause and resume all, files and sources of a bundle, remove a user, rescan or force in share after a failed content check, remove completed            |
+| Transfers        | window and optional bottom pane; remove a file or a user from the queue                                                                                            |
+| ADL Search       | searches that are matched against file lists                                                                                                                       |
+| Favorite hubs    | add, connect and edit favorite hubs                                                                                                                                |
+| System log       |                                                                                                                                                                    |
+| Settings         | see below                                                                                                                                                          |
 
 ## Settings
 
@@ -35,8 +36,8 @@ changed, depends on the permissions of the web user.
   window with unsaved changes asks first. This is the same on every page with settings, also on those under
   **View**. Lists (folders, profiles, users and so on) are changed right away through their dialogs, and buttons
   such as "Detect now" or "Pause" act at once.
-- **Home and startup**, **Colors**, **Tab highlights**, **Emoji** and **Shortcuts** are synced between your devices. If one of
-  these pages is changed on another device while you edit it, the change appears on your page; where both changed
+- **Home and startup**, **Colors**, **App icon**, **Tab highlights**, **Emoji** and **Shortcuts** are synced between your
+  devices. If one of these pages is changed on another device while you edit it, the change appears on your page; where both changed
   the same thing, yours stays and is what **Save changes** stores.
 - **Search settings**, the box at the top, finds pages and settings by name. Every word has to match, in the name
   of the setting, its explanation or the name of its page. Click a result to open the page; the setting is scrolled
@@ -64,6 +65,21 @@ changed, depends on the permissions of the web user.
 - The **×** at the top right closes the window that is shown. Windows can also be closed with the **×** on their
   tab, with a middle click on the tab, or from the tab's menu. Closing a connected hub asks first.
 - Closing the shown window returns to the window that you used before it.
+- On larger screens the **title bar** at the top names the window that is shown, as the Windows client does. For a
+  hub it is described under [Hub title and topic](#hub-title-and-topic).
+
+## Hub title and topic
+
+The title bar of a hub window shows the name of the hub and its topic:
+
+*AirDC++ | Hub name | Topic*
+
+- The **topic** is the description that the hub sends. A changed topic is shown as soon as the hub sends it, and the
+  last one stays while the hub is disconnected (until the page is reloaded). It is shown as plain text.
+- A title that doesn't fit is cut off. Hover over it to read all of it, or mark it with the mouse to copy it.
+- Hover over the **tab** of a hub to see its address, its connection state and the topic. The lock below the hub
+  window shows whether the connection is encrypted.
+- On a **phone** the topic is on a line below the hub name. Tap it to read the whole title, and tap again to close.
 
 ## Home
 
@@ -81,20 +97,54 @@ changed, depends on the permissions of the web user.
   default search options.
 
 **+ Add widget** at the top lists the available widgets; of System information, Recent PMs and Recent searches there
-is only one each. **⋮** on a widget changes or moves it, and **×** removes it.
+is only one each. A new widget is put in the highest free place. **⋮** on a widget changes it, and **×** removes it.
 
-All boxes are equally high: at least a normal height, and as high as System information needs. With all its
-sections it is a little higher than that, and more so with large text or several disks; the other boxes grow with it.
+### Widget places
 
-**Height**: all widgets except System information can be made taller under **⋮ → Height**: Normal, Tall (2 boxes) or Extra tall
-(3 boxes). The boxes are placed from left to right, row by row, and a tall box also occupies the place below it.
-With room for three columns, the order *A, B (tall), C, D, E* gives A and D stacked on the left, B in the middle
-and C and E stacked on the right. Use **Move earlier** and **Move later** to change the order. The number of
-columns depends on the width of the window; a phone shows one.
+On larger screens every widget **stays where it is**. In a wider window nothing moves or grows, and the extra room
+stays empty on the right. In a window that is too narrow for the arrangement, it is shown with narrower widgets.
+Only when a widget would become too narrow to use are they stacked in one column; they return to their places when
+the window is wide enough again.
+
+- **Drag a widget by its title bar** to move it, with a mouse, a pen or a finger. The others make way, and widgets
+  move up into free room above them. Dragging towards the top or bottom of the window scrolls. Esc cancels.
+- With the keyboard, move to the icon at the left of the title and use the arrow keys.
+- **⋮ → Arrange to fit this window** arranges the widgets anew for the present width of the window, in their present
+  order. Use it after moving to a much wider or narrower screen.
+
+Places are **stored in each browser**: every computer or browser has its own arrangement. The first time, the
+widgets are placed from left to right, row by row; if widgets have already been rearranged in some browser, a new
+one places them column by column in that order.
+
+**Phones** show one widget below the other, in the order of the columns on the large screen: the first column from
+top to bottom, then the next one. That order is the same on all devices, and follows the computer whose widgets were
+rearranged most recently. Opening Home on a computer for the first time sets it too, unless widgets have already
+been rearranged somewhere. On a phone, and where the widgets are stacked, **⋮ → Move up** and **Move down** change
+the order; this doesn't move widgets that already have places on a computer.
+
+### Widget sizes
+
+On larger screens, **drag a bottom corner** of a widget to change its width and height; both corners work. A width
+changes in steps of a quarter of a normal box, from half a box (System information: three quarters) up to the whole
+window, and a height in steps of 10 pixels. The side opposite the corner stays where it is, so to widen a widget at
+the right edge of the window, use its left corner. Widgets below make way. Dragging towards the bottom of the window
+scrolls. With the keyboard, move to the bottom right corner and use the arrow keys.
+
+**⋮ → Height** gives a widget one of three heights, Normal, Tall (2 boxes) or Extra tall (3 boxes); all widgets except
+System information have it. **⋮ → Reset size** returns a widget to the normal size.
+
+Sizes are **stored in each browser** and are not synced: every computer or browser has its own. Widgets and their
+content are still the same everywhere. Heights that earlier versions saved for all devices are used until a widget
+gets another size in that browser.
+
+A normal box is as wide as an equal share of the window that the widgets were first placed or last arranged in (as
+many side by side as fit at least 380 pixels wide). It is at least a normal height, or as high as System information
+needs; with all its sections that is a little higher, and more so with large text or several disks. Once you resize
+System information, the other boxes keep the height they had. **Reset size** on it lets them follow it again.
 
 On a **phone** the boxes size themselves: each is as high as its content, at most the normal height (System
-information as high as it needs), and longer feeds, notes and lists scroll inside their box. The heights chosen under **⋮ → Height** only apply to larger screens. They
-are kept when you use a phone, and can also be changed there.
+information as high as it needs), and longer feeds, notes and lists scroll inside their box. Chosen sizes don't
+apply there.
 
 ### IP addresses
 
@@ -212,15 +262,31 @@ The button writes the text code where there is one, so that others can read it i
 written as the character itself. On NMDC hubs such characters get lost unless the hub's character set is UTF-8
 (by default it is CP1252); ADC hubs transfer them.
 
+## App icon
+
+**Settings → View → App icon** replaces the icon of the web UI with a picture of your own. Press
+**Upload a picture…**, check the preview and press **Save changes**. **Use the standard icon** goes back.
+
+- The icon is shown on the browser tab and with the notifications of the browser, also on the login page of a browser
+  that you have used before.
+- It is the same on all your devices. Other web users have their own.
+- Pictures that the browser can show work, such as PNG, JPG, SVG, GIF, WebP and ICO, up to 10 MB. A square one looks
+  best; others get see-through borders. It is stored as a PNG of at most 192 × 192 pixels, and an animated picture
+  becomes a still one.
+- The icon is also offered to phones for a shortcut on their home screen. Whether one uses it depends on its browser,
+  and a shortcut that exists already may keep its old icon.
+
 ## Synced and per browser
 
 | Same on all devices of a web user                      | Stored in each browser                                                |
 |--------------------------------------------------------|-----------------------------------------------------------------------|
-| Home widgets, feeds and notes                          | text sizes, chat font, timestamps                                     |
-| colors, tab highlights and emoji                       | notifications and the other browser settings                          |
-| keyboard shortcuts and thumb buttons                   |                                                                       |
+| Home widgets, their order on phones, feeds and notes   | text sizes, chat font, timestamps                                     |
+| colors, app icon, tab highlights and emoji             | notifications and the other browser settings                          |
+| keyboard shortcuts and thumb buttons                   | places and sizes of the Home widgets                                  |
 | "Show the Home tab", "Open the system log …"           | tab order, column widths, pane sizes, whether the transfer pane shows |
 |                                                        | the Queued and Shared boxes and the options of the file list filter   |
+
+The [ADL searches](#adl-search) and their two settings belong to the client, so they are the same for all web users.
 
 Synced data is stored by the client in `WebUserData.json` in its configuration directory. It isn't encrypted.
 If two devices change the same note before seeing each other's text, both versions are kept in the note. With a
@@ -275,6 +341,55 @@ Apart from RegEx, upper and lower case don't matter. With **Any**, one of the co
 
 The boxes and options apply to every file list and are remembered by the browser. The text, column and match type
 belong to the window.
+
+## ADL Search
+
+ADL Search, known from the Windows client, matches a list of your own searches against a file list and collects what
+it finds in **result folders** at the top of the list, such as `<<<ADLSearch>>>`.
+
+Open the window with the **ADL Search** button of the toolbar, or from the **View** menu (on a phone: menu button →
+View).
+
+- **New**, **Properties**, **Remove**, **Move up** and **Move down** edit the searches; they are also in the menu of
+  a row, and Insert, Enter and Delete work in the list. The box in front of a search switches it on or off.
+- Changes are stored at once. If the searches have been changed from somewhere else in the meantime, nothing is
+  overwritten: the new list is shown, and you make your change again.
+- **Reload** reads `ADLSearch.xml` from the configuration directory again. The file has the format of the Windows
+  client.
+
+A search has these properties:
+
+| Property              | Meaning                                                                                          |
+|-----------------------|--------------------------------------------------------------------------------------------------|
+| Search string         | every word, separated by spaces, has to be found; upper and lower case don't matter              |
+| Regular expression    | the string is a regular expression for any part of the name; case matters unless it starts `(?i)`; a tester is below the box |
+| Source type           | **Filename**; **Directory** (the whole folder becomes a result); **Full Path**, written with `\` |
+| Destination directory | name of the result folder; `ADLSearch` if left empty                                             |
+| File size             | smallest and largest size of matching files; not used for directories                            |
+| Download matches      | adds matching files of another user to the queue; does nothing for a directory search            |
+| Enabled               | only enabled searches are used                                                                   |
+
+The two boxes above the list:
+
+- **Match ADL when a full file list is opened** (on by default): the full list of another user is matched as soon as
+  it arrives.
+- **Stop after the first match** (off by default): a file or folder is found by one search only, so the order of the
+  searches matters. A search with the destination `discard` has no result folder. With this box ticked and such a
+  search placed first, what it matches is left out of all other results.
+
+In a file list:
+
+- **Match ADL**, next to the path (on a phone **ADL**), matches the list at any time, for example after changing the
+  searches, and also your own list. If only a part of the list is open, it asks and then downloads the full list.
+  **Get full file list** in the menu of a user opens the full list right away.
+- **Go to directory** in the menu of a result shows where the file or folder is in the list. **Back** returns.
+- Downloading works as elsewhere. A whole result folder is saved under its name without `<<<` and `>>>`.
+- While the list is being matched it is read again, which takes a moment for a large list. A full list can't be
+  reloaded with the **Reload** button.
+
+Seeing the searches requires the permission to view settings, changing them the permission to edit settings, and
+**Match ADL** the permission to download. ADL Search needs `daemon-adl-search.patch`
+(see the [main README](../README.md#adl-search)).
 
 ## Viewing files
 
@@ -338,6 +453,7 @@ appear once the client has hashed them; use **Reload** if the list doesn't show 
 | Open own file list             | Alt+L         |                |
 | System log                     | Alt+G         |                |
 | Settings                       | Alt+O         |                |
+| ADL Search                     | none          |                |
 | Refresh share                  | none          |                |
 | Away mode on or off            | none          |                |
 
@@ -356,7 +472,18 @@ off, and change them:
 
 Shortcuts also work while you type in a field, but not while a dialog is open. A thumb button that has a shortcut no
 longer goes back or forward in the history of the browser; one without a shortcut, or switched off, does so as usual.
-If your browser or mouse software handles the buttons itself so that the page never gets them, they can't switch tabs.
+
+How the thumb buttons depend on the browser:
+
+- Chrome and other browsers built on it give the buttons to the page, which is all that is needed.
+- Firefox on a computer does so from version 162. Earlier versions only go back or forward, so the web UI catches
+  that in the history of the page. There, anything that goes back or forward, such as the arrows in the toolbar,
+  uses the shortcuts of the thumb buttons, and the page needs one click or key press after it is opened. After the
+  page has been reloaded, leaving it with Back (when the button has no shortcut) can take an extra press. Switch the
+  thumb buttons off to have none of this.
+- Safari on a Mac is reported to ignore these buttons. Use the keys there.
+
+If your mouse software gives the buttons another job, the browser never hears of them and they can't switch tabs.
 
 ## Using the mouse and keyboard
 
@@ -367,6 +494,17 @@ If your browser or mouse software handles the buttons itself so that the page ne
 
 On a phone the layout changes to one window at a time. The menu button opens the window list and menus,
 **⋮** opens the menu of a row and a long press starts selecting several rows.
+
+### Long names
+
+In search results and file lists the name column is as wide as the longest name in the list, so that every name can
+be read to the end by scrolling sideways: with the scrollbar, a touchpad, Shift and the mouse wheel, the Left and
+Right arrow keys, or on a phone by swiping (size and **⋮** stay at the right edge there). A long name therefore
+moves the other columns further to the right.
+
+To choose the width yourself, drag the edge of the name column. To get the full names back, double-click that edge,
+or tick **Show full names** in the menu of the column header; unticking it gives the usual width. The browser
+remembers the choice.
 
 ## Development
 

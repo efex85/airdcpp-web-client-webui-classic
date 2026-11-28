@@ -21,6 +21,7 @@ export type WindowType =
   | 'home'
   | 'syslog'
   | 'favorites'
+  | 'adl'
   | 'queue'
   | 'transfers'
   | 'settings'
@@ -80,7 +81,7 @@ export interface AppState {
 }
 
 /** Windows that are restored after reloading the page or logging in again */
-const STATIC_TABS = ['home', 'syslog', 'favorites', 'queue', 'settings'];
+const STATIC_TABS = ['home', 'syslog', 'favorites', 'queue', 'adl', 'settings'];
 
 const storedTabs = () => load<string[]>('tabs', []).filter((key) => STATIC_TABS.includes(key));
 

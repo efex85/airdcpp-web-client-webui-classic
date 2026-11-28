@@ -1,0 +1,1253 @@
+diff --git a/airdcpp-core/CMakeLists.txt b/airdcpp-core/CMakeLists.txt
+index 6d6bd4ac..0d4c9803 100644
+--- a/airdcpp-core/CMakeLists.txt
++++ b/airdcpp-core/CMakeLists.txt
+@@ -34,6 +34,10 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${airdcpp_hdrs})
+ if (NOT BUILD_CORE_MODULES)
+   list(FILTER airdcpp_srcs EXCLUDE REGEX "${PROJECT_SOURCE_DIR}/airdcpp/modules/.*" )
+   list(FILTER airdcpp_hdrs EXCLUDE REGEX "${PROJECT_SOURCE_DIR}/airdcpp/modules/.*" )
++
++  # ADLSearch is used by the file lists and the web API
++  list(APPEND airdcpp_srcs ${PROJECT_SOURCE_DIR}/airdcpp/modules/ADLSearch.cpp)
++  list(APPEND airdcpp_hdrs ${PROJECT_SOURCE_DIR}/airdcpp/modules/ADLSearch.h)
+ endif ()
+ 
+ if (NOT WIN32)
+diff --git a/airdcpp-core/airdcpp/filelist/DirectoryListing.cpp b/airdcpp-core/airdcpp/filelist/DirectoryListing.cpp
+index 0d77dca6..ced42cf2 100644
+--- a/airdcpp-core/airdcpp/filelist/DirectoryListing.cpp
++++ b/airdcpp-core/airdcpp/filelist/DirectoryListing.cpp
+@@ -26,6 +26,7 @@
+ #include <airdcpp/hub/ClientManager.h>
+ #include <airdcpp/core/io/stream/FilteredFile.h>
+ #include <airdcpp/events/LogManager.h>
++#include <airdcpp/modules/ADLSearch.h>
+ #include <airdcpp/queue/QueueManager.h>
+ #include <airdcpp/core/localization/ResourceManager.h>
+ #include <airdcpp/share/ShareManager.h>
+@@ -452,7 +453,15 @@ void DirectoryListing::loadFileImpl(const string& aInitialDir) {
+ 	// In case we are reloading...
+ 	root->clearAll();
+ 
+-	loadFile();
++	try {
++		loadFile();
++	} catch (...) {
++		if (currentLocation.directory) {
++			leaveRemovedDirectory(root);
++		}
++
++		throw;
++	}
+ 
+ 	onLoadingFinished(start, aInitialDir, curDirectoryPath, false);
+ }
+@@ -462,6 +471,11 @@ void DirectoryListing::onLoadingFinished(int64_t aStartTime, const string& aLoad
+ 		checkDupes();
+ 	}
+ 
++	// Before the current directory is looked up: it may be one of the ADLSearch result folders
++	if (!partialList && matchADL) {
++		matchADLImpl();
++	}
++
+ 	auto loadedDir = findDirectoryUnsafe(aLoadedPath);
+ 	if (!loadedDir) {
+ 		// Base path should have been validated while loading partial list
+@@ -498,11 +512,39 @@ void DirectoryListing::onLoadingFinished(int64_t aStartTime, const string& aLoad
+ 	fire(DirectoryListingListener::LoadingFinished(), aStartTime, loadedDir->getAdcPathUnsafe(), static_cast<uint8_t>(changeType));
+ }
+ 
++void DirectoryListing::matchADLImpl() noexcept {
++	auto manager = ADLSearchManager::getInstance();
++	if (!manager) {
++		return;
++	}
++
++	try {
++		// Remove old results first
++		root->clearVirtualDirectories();
++		manager->matchListing(*this);
++	} catch (const AbortException&) {
++		// The list is being closed
++	} catch (const std::bad_alloc&) {
++		log(STRING_F(LIST_LOAD_FAILED, getNick(false) % STRING(OUT_OF_MEMORY)), LogMessage::SEV_ERROR);
++	}
++}
++
+ void DirectoryListing::updateCurrentLocation(const DirectoryPtr& aCurrentDirectory) noexcept {
+-	currentLocation.directories = static_cast<int>(aCurrentDirectory->directories.size());
+-	currentLocation.files = static_cast<int>(aCurrentDirectory->files.size());
+-	currentLocation.totalSize = aCurrentDirectory->getTotalSize(false);
+-	currentLocation.directory = aCurrentDirectory;
++	LocationInfo location;
++	location.directories = static_cast<int>(aCurrentDirectory->directories.size());
++	location.files = static_cast<int>(aCurrentDirectory->files.size());
++	location.totalSize = aCurrentDirectory->getTotalSize(false);
++	location.directory = aCurrentDirectory;
++
++	{
++		WLock l(locationCS);
++		std::swap(currentLocation, location);
++	}
++}
++
++void DirectoryListing::leaveRemovedDirectory(const DirectoryPtr& aNewDirectory) noexcept {
++	updateCurrentLocation(aNewDirectory);
++	fire(DirectoryListingListener::ChangeDirectory(), aNewDirectory->getAdcPathUnsafe(), static_cast<uint8_t>(DirectoryLoadType::CHANGE_NORMAL));
+ }
+ 
+ void DirectoryListing::loadPartialImpl(const string& aXml, const string& aBasePath, bool aBackgroundTask, const AsyncF& aCompletionF) {
+@@ -511,10 +553,10 @@ void DirectoryListing::loadPartialImpl(const string& aXml, const string& aBasePa
+ 
+ 	auto curDirectoryPath = !currentLocation.directory ? Util::emptyString : currentLocation.directory->getAdcPathUnsafe();
+ 	DirectoryPtr optionalOldDirectory = nullptr;
++	bool reloading = false;
+ 
+ 	// Preparations
+ 	{
+-		bool reloading = false;
+ 
+ 		// Has this directory been loaded before? Existing content must be cleared in that case
+ 		optionalOldDirectory = findDirectoryUnsafe(aBasePath);
+@@ -541,6 +583,10 @@ void DirectoryListing::loadPartialImpl(const string& aXml, const string& aBasePa
+ 	} catch (const Exception&) {
+ 		if (optionalOldDirectory) {
+ 			setDirectoryLoadingState(optionalOldDirectory, DirectoryLoadType::NONE);
++
++			if (reloading && curDirectoryPath != aBasePath && PathUtil::isParentOrExactAdc(aBasePath, curDirectoryPath)) {
++				leaveRemovedDirectory(optionalOldDirectory);
++			}
+ 		}
+ 
+ 		throw;
+@@ -555,7 +601,8 @@ void DirectoryListing::loadPartialImpl(const string& aXml, const string& aBasePa
+ }
+ 
+ bool DirectoryListing::isLoaded() const noexcept {
+-	return currentLocation.directory && currentLocation.directory->getLoading() == DirectoryLoadType::NONE;
++	const auto directory = getCurrentLocationInfo().directory;
++	return directory && directory->getLoading() == DirectoryLoadType::NONE;
+ }
+ 
+ void DirectoryListing::matchQueueImpl() noexcept {
+diff --git a/airdcpp-core/airdcpp/filelist/DirectoryListing.h b/airdcpp-core/airdcpp/filelist/DirectoryListing.h
+index 22b799e9..4e048d22 100644
+--- a/airdcpp-core/airdcpp/filelist/DirectoryListing.h
++++ b/airdcpp-core/airdcpp/filelist/DirectoryListing.h
+@@ -27,6 +27,7 @@
+ #include <airdcpp/share/ShareManagerListener.h>
+ 
+ #include <airdcpp/core/ActionHook.h>
++#include <airdcpp/core/thread/CriticalSection.h>
+ #include <airdcpp/core/types/DirectoryContentInfo.h>
+ #include <airdcpp/core/queue/DispatcherQueue.h>
+ #include <airdcpp/core/types/DupeType.h>
+@@ -131,6 +132,10 @@ public:
+ 	void addOwnListLoadTask(const string& aBasePath, bool aBackgroundTask = false) noexcept;
+ 
+ 	void addFullListTask(const string& aDir) noexcept;
++
++	// Match the full list with ADLSearch every time it's loaded
++	void setMatchADL(bool aMatch) noexcept { matchADL = aMatch; }
++	bool getMatchADL() const noexcept { return matchADL; }
+ 	void addQueueMatchTask() noexcept;
+ 
+ 	void addAsyncTask(Callback&& f) noexcept;
+@@ -149,7 +154,9 @@ public:
+ 		DirectoryPtr directory = nullptr;
+ 	};
+ 
+-	const LocationInfo& getCurrentLocationInfo() const noexcept {
++	// A copy, as other threads may ask while the thread of the list changes the location
++	LocationInfo getCurrentLocationInfo() const noexcept {
++		RLock l(locationCS);
+ 		return currentLocation;
+ 	}
+ 
+@@ -196,9 +203,14 @@ private:
+ 	void setShareProfileImpl(ProfileToken aProfile) noexcept;
+ 	void setHubUrlImpl(const string_view& aHubUrl) noexcept;
+ 
++	// Changed by the thread of the list only (which may read it without locking)
+ 	LocationInfo currentLocation;
++	mutable SharedMutex locationCS;
+ 	void updateCurrentLocation(const DirectoryPtr& aCurrentDirectory) noexcept;
+ 
++	// For leaving a directory whose parents have been removed without new content having been loaded
++	void leaveRemovedDirectory(const DirectoryPtr& aNewDirectory) noexcept;
++
+ 	friend class ListLoader;
+ 
+ 	DirectoryPtr root;
+@@ -235,6 +247,8 @@ private:
+ 
+ 	HintedUser hintedUser;
+ 	bool read = false;
++	std::atomic<bool> matchADL { false };
++	void matchADLImpl() noexcept;
+ 
+ 	void checkDupes() noexcept;
+ 	void onLoadingFinished(int64_t aStartTime, const string& aLoadedPath, const string& aCurrentPath, bool aBackgroundTask) noexcept;
+diff --git a/airdcpp-core/airdcpp/filelist/DirectoryListingDirectory.cpp b/airdcpp-core/airdcpp/filelist/DirectoryListingDirectory.cpp
+index ea31ff0a..a7a78e58 100644
+--- a/airdcpp-core/airdcpp/filelist/DirectoryListingDirectory.cpp
++++ b/airdcpp-core/airdcpp/filelist/DirectoryListingDirectory.cpp
+@@ -255,7 +255,7 @@ void DirectoryListing::Directory::getLocalPathsUnsafe(StringList& ret, const Opt
+ 	string path;
+ 	if (isVirtual()) {
+ 		auto virtualDir = static_cast<const VirtualDirectory*>(this);
+-		path = virtualDir->getFullAdcPath() + name;
++		path = virtualDir->getFullAdcPath(); // Includes the name of the directory
+ 	} else {
+ 		path = getAdcPathUnsafe();
+ 	}
+diff --git a/airdcpp-core/airdcpp/filelist/DirectoryListingManager.cpp b/airdcpp-core/airdcpp/filelist/DirectoryListingManager.cpp
+index 65640e02..a87ef3df 100644
+--- a/airdcpp-core/airdcpp/filelist/DirectoryListingManager.cpp
++++ b/airdcpp-core/airdcpp/filelist/DirectoryListingManager.cpp
+@@ -477,6 +477,8 @@ DirectoryListingPtr DirectoryListingManager::openLocalFileList(const HintedUser&
+ 
+ DirectoryListingPtr DirectoryListingManager::createList(const HintedUser& aUser, bool aPartial, const string& aFileName, bool aIsOwnList) noexcept {
+ 	auto dl = make_shared<DirectoryListing>(aUser, aPartial, aFileName, true, &loadHooks, aIsOwnList);
++	// As the Windows client: lists that are opened as full lists, if the setting is on
++	dl->setMatchADL(!aPartial && !aIsOwnList && SETTING(USE_ADLS));
+ 
+ 	{
+ 		WLock l(cs);
+diff --git a/airdcpp-core/airdcpp/modules/ADLSearch.cpp b/airdcpp-core/airdcpp/modules/ADLSearch.cpp
+index 2ad67555..83cfc6a8 100644
+--- a/airdcpp-core/airdcpp/modules/ADLSearch.cpp
++++ b/airdcpp-core/airdcpp/modules/ADLSearch.cpp
+@@ -292,15 +292,9 @@ ADLSearch ADLSearchManager::loadSearch(SimpleXML& xml) {
+ }
+ 
+ void ADLSearchManager::load() noexcept {
+-	if (running > 0) {
+-		log(CSTRING(ADLSEARCH_IN_PROGRESS), LogMessage::SEV_ERROR);
+-		return;
+-	}
+-
+-	// Clear current
+-	collection.clear();
++	SearchCollection loaded;
+ 
+-	SettingsManager::loadSettingFile(CONFIG_DIR, CONFIG_NAME, [this](SimpleXML& xml) {
++	SettingsManager::loadSettingFile(CONFIG_DIR, CONFIG_NAME, [this, &loaded](SimpleXML& xml) {
+ 		if(xml.findChild("ADLSearch")) {
+ 			xml.stepIn();
+ 
+@@ -318,7 +312,7 @@ void ADLSearchManager::load() noexcept {
+ 
+ 					// Add search to collection
+ 					if(!search.getPattern().empty()) {
+-						collection.push_back(std::move(search));
++						loaded.push_back(std::move(search));
+ 					}
+ 
+ 					// Go to next search
+@@ -328,9 +322,42 @@ void ADLSearchManager::load() noexcept {
+ 		}
+ 	});
+ 
+-	for(auto& s: collection) {
++	for(auto& s: loaded) {
+ 		s.prepare();
+ 	}
++
++	Lock l(cs);
++	collection = std::move(loaded);
++	// Revisions from before a restart must not be accepted
++	revision = max(revision + 1, static_cast<uint64_t>(GET_TIME()) * 1000);
++}
++
++ADLSearchManager::SearchCollection ADLSearchManager::getSearches(uint64_t& revision_) const noexcept {
++	Lock l(cs);
++	revision_ = revision;
++	return collection;
++}
++
++ADLSearchManager::SetResult ADLSearchManager::setSearches(SearchCollection aSearches, uint64_t aRevision) noexcept {
++	for (auto& s: aSearches) {
++		s.prepare();
++	}
++
++	Lock l(cs);
++	if (aRevision != revision) {
++		return SetResult::CONFLICT;
++	}
++
++	auto old = std::move(collection);
++	collection = std::move(aSearches);
++	if (!saveFile()) {
++		collection = std::move(old);
++		return SetResult::SAVE_FAILED;
++	}
++
++	dirty = false;
++	revision++;
++	return SetResult::OK;
+ }
+ 
+ bool ADLSearchManager::addCollection(ADLSearch& search, int index) noexcept {
+@@ -392,7 +419,11 @@ void ADLSearchManager::save(bool force /*false*/) noexcept {
+ 		return;
+ 
+ 	dirty = false;
++	saveFile();
++}
+ 
++bool ADLSearchManager::saveFile() noexcept {
++	Lock l(cs);
+ 	SimpleXML xml;
+ 
+ 	xml.addTag("ADLSearch");
+@@ -426,7 +457,7 @@ void ADLSearchManager::save(bool force /*false*/) noexcept {
+ 
+ 	xml.stepOut();
+ 
+-	SettingsManager::saveSettingFile(xml, CONFIG_DIR, CONFIG_NAME);
++	return SettingsManager::saveSettingFile(xml, CONFIG_DIR, CONFIG_NAME);
+ }
+ 
+ void ADLSearchManager::MatchesFile(DestDirList& destDirVector, const DirectoryListing::File::Ptr& currentFile, const string& aAdcPath) noexcept {
+@@ -452,7 +483,7 @@ void ADLSearchManager::MatchesFile(DestDirList& destDirVector, const DirectoryLi
+ 	const auto nmdcPath = PathUtil::toNmdcFile(aAdcPath + currentFile->getName());
+ 
+ 	// Match searches
+-	for(auto& is: collection) {
++	for(auto& is: matching) {
+ 		if(destDirVector[is.ddIndex].fileAdded) {
+ 			continue;
+ 		}
+@@ -493,7 +524,7 @@ void ADLSearchManager::MatchesDirectory(DestDirList& destDirVector, const Direct
+ 		return;
+ 	}
+ 
+-	for (auto& is: collection) {
++	for (auto& is: matching) {
+ 		if(destDirVector[is.ddIndex].subdir) {
+ 			continue;
+ 		}
+@@ -538,7 +569,7 @@ void ADLSearchManager::PrepareDestinationDirectories(DestDirList& destDirs, Dire
+ 	addRootDirectory("ADLSearch", destDirs, root);
+ 
+ 	// Scan all loaded searches
+-	for(auto& is: collection) {
++	for(auto& is: matching) {
+ 		// Check empty destination directory
+ 		if(is.getDestDir().size() == 0) {
+ 			// Set to default
+@@ -584,6 +615,12 @@ void ADLSearchManager::FinalizeDestinationDirectories(DestDirList& destDirs, Dir
+ }
+ 
+ void ADLSearchManager::matchListing(DirectoryListing& aDirList) {
++	Lock matchLock(matchCs);
++	{
++		Lock l(cs);
++		matching = collection;
++	}
++
+ 	running++;
+ 	ScopedFunctor([&] { running--; });
+ 
+diff --git a/airdcpp-core/airdcpp/modules/ADLSearch.h b/airdcpp-core/airdcpp/modules/ADLSearch.h
+index 29089f87..5c0d5503 100644
+--- a/airdcpp-core/airdcpp/modules/ADLSearch.h
++++ b/airdcpp-core/airdcpp/modules/ADLSearch.h
+@@ -27,6 +27,7 @@
+ #include <airdcpp/filelist/DirectoryListingDirectory.h>
+ #include <airdcpp/message/Message.h>
+ #include <airdcpp/core/Singleton.h>
++#include <airdcpp/core/thread/CriticalSection.h>
+ #include <airdcpp/util/text/StringMatch.h>
+ 
+ namespace dcpp {
+@@ -155,6 +156,14 @@ public:
+ 	bool updateCollection(ADLSearch& search, int index) noexcept;
+ 	int8_t getRunning() const noexcept { return running; }
+ 
++	// For the web API: safe to call from any thread, also while lists are being matched
++	enum class SetResult { OK, CONFLICT, SAVE_FAILED };
++
++	// A copy of the searches, with the revision that setSearches expects
++	SearchCollection getSearches(uint64_t& revision_) const noexcept;
++	// Replaces all searches and saves them, unless they have been changed since the given revision was read
++	SetResult setSearches(SearchCollection aSearches, uint64_t aRevision) noexcept;
++
+ 	static void log(const string& aMsg, LogMessage::Severity aSeverity) noexcept;
+ private:
+ 	ADLSearch loadSearch(SimpleXML& xml);
+@@ -179,6 +188,15 @@ private:
+ 	void FinalizeDestinationDirectories(DestDirList& destDirVector, DirectoryListing::Directory::Ptr& root) noexcept;
+ 
+ 	int8_t running = 0;
++
++	bool saveFile() noexcept;
++
++	// Guards the collection and its revision
++	mutable CriticalSection cs;
++	// One list is matched at a time, with its own copy of the searches
++	CriticalSection matchCs;
++	SearchCollection matching;
++	uint64_t revision = 0;
+ };
+ 
+ } // namespace dcpp
+diff --git a/airdcpp-webapi/api/AdlSearchApi.cpp b/airdcpp-webapi/api/AdlSearchApi.cpp
+new file mode 100644
+index 00000000..3562604f
+--- /dev/null
++++ b/airdcpp-webapi/api/AdlSearchApi.cpp
+@@ -0,0 +1,223 @@
++/*
++* This program is free software; you can redistribute it and/or modify
++* it under the terms of the GNU General Public License as published by
++* the Free Software Foundation; either version 3 of the License, or
++* (at your option) any later version.
++*
++* This program is distributed in the hope that it will be useful,
++* but WITHOUT ANY WARRANTY; without even the implied warranty of
++* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++* GNU General Public License for more details.
++*
++* You should have received a copy of the GNU General Public License
++* along with this program; if not, write to the Free Software
++* Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++*/
++
++#include "stdinc.h"
++
++#include <api/AdlSearchApi.h>
++
++#include <web-server/JsonUtil.h>
++
++#include <airdcpp/settings/SettingsManager.h>
++#include <airdcpp/util/text/StringMatch.h>
++
++#define MAX_SEARCHES 1000
++#define MAX_TEXT_LENGTH 4096
++// Large enough for any file, and small enough to be multiplied with the size unit
++#define MAX_SIZE_VALUE 1000000000
++
++namespace webserver {
++	static const StringList sourceTypes = { "file", "directory", "full_path" };
++	static const StringList sizeUnits = { "B", "KiB", "MiB", "GiB" };
++
++	AdlSearchApi::AdlSearchApi(Session* aSession) : ApiModule(aSession) {
++		METHOD_HANDLER(Access::SETTINGS_VIEW,	METHOD_GET,		(EXACT_PARAM("searches")),	AdlSearchApi::handleGetSearches);
++		METHOD_HANDLER(Access::SETTINGS_EDIT,	METHOD_POST,	(EXACT_PARAM("searches")),	AdlSearchApi::handleSetSearches);
++		METHOD_HANDLER(Access::SETTINGS_EDIT,	METHOD_POST,	(EXACT_PARAM("reload")),	AdlSearchApi::handleReload);
++		METHOD_HANDLER(Access::SETTINGS_EDIT,	METHOD_POST,	(EXACT_PARAM("settings")),	AdlSearchApi::handleSetSettings);
++		METHOD_HANDLER(Access::SETTINGS_VIEW,	METHOD_POST,	(EXACT_PARAM("test")),		AdlSearchApi::handleTest);
++	}
++
++	json AdlSearchApi::serializeSearch(ADLSearch& aSearch) noexcept {
++		return {
++			{ "pattern", aSearch.getPattern() },
++			{ "regex", aSearch.isRegEx() },
++			{ "source_type", sourceTypes[aSearch.sourceType] },
++			{ "destination", aSearch.getDestDir() },
++			{ "min_size", aSearch.minFileSize },
++			{ "max_size", aSearch.maxFileSize },
++			{ "size_unit", sizeUnits[aSearch.typeFileSize] },
++			{ "comment", aSearch.adlsComment },
++			{ "active", aSearch.isActive },
++			{ "download", aSearch.isAutoQueue },
++		};
++	}
++
++	json AdlSearchApi::serializeAll() noexcept {
++		uint64_t revision = 0;
++		auto searches = ADLSearchManager::getInstance()->getSearches(revision);
++
++		auto items = json::array();
++		for (auto& s: searches) {
++			items.push_back(serializeSearch(s));
++		}
++
++		return {
++			{ "revision", revision },
++			{ "searches", items },
++			{ "settings", {
++				{ "match_full_lists", SETTING(USE_ADLS) },
++				{ "break_on_first", SETTING(ADLS_BREAK_ON_FIRST) },
++			} },
++		};
++	}
++
++	bool AdlSearchApi::isValidRegex(const string& aPattern) noexcept {
++		StringMatch match(false);
++		match.pattern = aPattern;
++		match.setMethod(StringMatch::REGEX);
++		return match.prepare();
++	}
++
++	ADLSearch AdlSearchApi::deserializeSearch(const json& aJson, const string& aFieldName) {
++		auto pattern = JsonUtil::getField<string>("pattern", aJson, false);
++		auto regex = JsonUtil::getOptionalFieldDefault<bool>("regex", aJson, false);
++		auto destination = JsonUtil::getOptionalFieldDefault<string>("destination", aJson, Util::emptyString);
++		auto comment = JsonUtil::getOptionalFieldDefault<string>("comment", aJson, Util::emptyString);
++
++		if (pattern.size() > MAX_TEXT_LENGTH || destination.size() > MAX_TEXT_LENGTH || comment.size() > MAX_TEXT_LENGTH) {
++			JsonUtil::throwError(aFieldName, JsonException::ERROR_INVALID, "The text is too long");
++		}
++
++		// A search without any word would match everything
++		if (pattern.find_first_not_of(" \t\r\n") == string::npos) {
++			JsonUtil::throwError(aFieldName, JsonException::ERROR_INVALID, "The search string is empty");
++		}
++
++		if (regex && !isValidRegex(pattern)) {
++			JsonUtil::throwError(aFieldName, JsonException::ERROR_INVALID, "Invalid regular expression: " + pattern);
++		}
++
++		// The name of a result folder
++		if (destination.find_first_of("/\\") != string::npos) {
++			JsonUtil::throwError(aFieldName, JsonException::ERROR_INVALID, "The destination can't contain / or \\");
++		}
++
++		const auto indexOf = [&](const StringList& aValues, const string& aKey) {
++			auto value = JsonUtil::getOptionalFieldDefault<string>(aKey, aJson, aValues.front());
++			auto i = ranges::find(aValues, value);
++			if (i == aValues.end()) {
++				JsonUtil::throwError(aFieldName, JsonException::ERROR_INVALID, "Invalid value for " + aKey);
++			}
++
++			return static_cast<int>(distance(aValues.begin(), i));
++		};
++
++		const auto size = [&](const string& aKey) {
++			auto value = JsonUtil::getOptionalFieldDefault<int64_t>(aKey, aJson, -1);
++			if (value < -1 || value > MAX_SIZE_VALUE) {
++				JsonUtil::throwError(aFieldName, JsonException::ERROR_INVALID, "Invalid value for " + aKey);
++			}
++
++			return value;
++		};
++
++		ADLSearch search;
++		search.setRegEx(regex);
++		search.setPattern(pattern);
++		search.setDestDir(destination);
++		search.adlsComment = comment;
++		search.sourceType = static_cast<ADLSearch::SourceType>(indexOf(sourceTypes, "source_type"));
++		search.typeFileSize = static_cast<ADLSearch::SizeType>(indexOf(sizeUnits, "size_unit"));
++		search.minFileSize = size("min_size");
++		search.maxFileSize = size("max_size");
++		search.isActive = JsonUtil::getOptionalFieldDefault<bool>("active", aJson, true);
++		search.isAutoQueue = JsonUtil::getOptionalFieldDefault<bool>("download", aJson, false);
++		return search;
++	}
++
++	api_return AdlSearchApi::handleGetSearches(ApiRequest& aRequest) {
++		aRequest.setResponseBody(serializeAll());
++		return http::status::ok;
++	}
++
++	api_return AdlSearchApi::handleSetSearches(ApiRequest& aRequest) {
++		const auto& reqJson = aRequest.getRequestBody();
++		const auto revision = JsonUtil::getField<uint64_t>("revision", reqJson);
++		const auto& items = JsonUtil::getArrayField("searches", reqJson, true);
++		if (items.size() > MAX_SEARCHES) {
++			JsonUtil::throwError("searches", JsonException::ERROR_INVALID, "Too many searches");
++		}
++
++		ADLSearchManager::SearchCollection searches;
++		if (items.is_array()) {
++			for (const auto& item: items) {
++				searches.push_back(deserializeSearch(item, "searches"));
++			}
++		}
++
++		switch (ADLSearchManager::getInstance()->setSearches(std::move(searches), revision)) {
++			case ADLSearchManager::SetResult::OK: break;
++			case ADLSearchManager::SetResult::CONFLICT: {
++				aRequest.setResponseErrorStr("The searches have been changed elsewhere");
++				return http::status::conflict;
++			}
++			case ADLSearchManager::SetResult::SAVE_FAILED: {
++				aRequest.setResponseErrorStr("Saving the searches failed (see the system log)");
++				return http::status::internal_server_error;
++			}
++		}
++
++		aRequest.setResponseBody(serializeAll());
++		return http::status::ok;
++	}
++
++	api_return AdlSearchApi::handleReload(ApiRequest& aRequest) {
++		ADLSearchManager::getInstance()->load();
++		aRequest.setResponseBody(serializeAll());
++		return http::status::ok;
++	}
++
++	api_return AdlSearchApi::handleSetSettings(ApiRequest& aRequest) {
++		const auto& reqJson = aRequest.getRequestBody();
++		auto matchFullLists = JsonUtil::getOptionalField<bool>("match_full_lists", reqJson);
++		auto breakOnFirst = JsonUtil::getOptionalField<bool>("break_on_first", reqJson);
++
++		auto settings = SettingsManager::getInstance();
++		if (matchFullLists) {
++			settings->set(SettingsManager::USE_ADLS, *matchFullLists);
++		}
++
++		if (breakOnFirst) {
++			settings->set(SettingsManager::ADLS_BREAK_ON_FIRST, *breakOnFirst);
++		}
++
++		settings->save();
++
++		aRequest.setResponseBody(serializeAll());
++		return http::status::ok;
++	}
++
++	// Tests a search string against a name, with the same matching as ADLSearch
++	api_return AdlSearchApi::handleTest(ApiRequest& aRequest) {
++		const auto& reqJson = aRequest.getRequestBody();
++		auto pattern = JsonUtil::getField<string>("pattern", reqJson, false);
++		auto text = JsonUtil::getField<string>("text", reqJson, true);
++		auto regex = JsonUtil::getOptionalFieldDefault<bool>("regex", reqJson, false);
++		if (pattern.size() > MAX_TEXT_LENGTH || text.size() > MAX_TEXT_LENGTH) {
++			JsonUtil::throwError("pattern", JsonException::ERROR_INVALID, "The text is too long");
++		}
++
++		if (regex && !isValidRegex(pattern)) {
++			JsonUtil::throwError("pattern", JsonException::ERROR_INVALID, "Invalid regular expression");
++		}
++
++		auto match = StringMatch::getSearch(pattern, regex ? StringMatch::REGEX : StringMatch::PARTIAL);
++		aRequest.setResponseBody({
++			{ "match", match.match(text) },
++		});
++		return http::status::ok;
++	}
++}
+diff --git a/airdcpp-webapi/api/AdlSearchApi.h b/airdcpp-webapi/api/AdlSearchApi.h
+new file mode 100644
+index 00000000..8345b844
+--- /dev/null
++++ b/airdcpp-webapi/api/AdlSearchApi.h
+@@ -0,0 +1,45 @@
++/*
++* This program is free software; you can redistribute it and/or modify
++* it under the terms of the GNU General Public License as published by
++* the Free Software Foundation; either version 3 of the License, or
++* (at your option) any later version.
++*
++* This program is distributed in the hope that it will be useful,
++* but WITHOUT ANY WARRANTY; without even the implied warranty of
++* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++* GNU General Public License for more details.
++*
++* You should have received a copy of the GNU General Public License
++* along with this program; if not, write to the Free Software
++* Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
++*/
++
++#ifndef DCPLUSPLUS_DCPP_ADLSEARCHAPI_H
++#define DCPLUSPLUS_DCPP_ADLSEARCHAPI_H
++
++#include <api/base/ApiModule.h>
++
++#include <airdcpp/core/header/typedefs.h>
++#include <airdcpp/modules/ADLSearch.h>
++
++namespace webserver {
++	// The searches of ADLSearch ("Automatic Directory Listing search") and its settings
++	class AdlSearchApi : public ApiModule {
++	public:
++		explicit AdlSearchApi(Session* aSession);
++	private:
++		api_return handleGetSearches(ApiRequest& aRequest);
++		api_return handleSetSearches(ApiRequest& aRequest);
++		api_return handleReload(ApiRequest& aRequest);
++		api_return handleSetSettings(ApiRequest& aRequest);
++		api_return handleTest(ApiRequest& aRequest);
++
++		static json serializeAll() noexcept;
++		static json serializeSearch(ADLSearch& aSearch) noexcept;
++		static ADLSearch deserializeSearch(const json& aJson, const string& aFieldName);
++
++		static bool isValidRegex(const string& aPattern) noexcept;
++	};
++}
++
++#endif
+diff --git a/airdcpp-webapi/api/FilelistApi.cpp b/airdcpp-webapi/api/FilelistApi.cpp
+index ce425f96..c9525a5b 100644
+--- a/airdcpp-webapi/api/FilelistApi.cpp
++++ b/airdcpp-webapi/api/FilelistApi.cpp
+@@ -47,7 +47,7 @@ namespace webserver {
+ 	FilelistApi::FilelistApi(Session* aSession) : 
+ 		ParentApiModule(CID_PARAM, Access::FILELISTS_VIEW, aSession, 
+ 			[](const string& aId) { return Deserializer::parseCID(aId); },
+-			[](const FilelistInfo& aInfo) { return serializeList(aInfo.getList()); },
++			[](const FilelistInfo& aInfo) { return serializeList(aInfo.getList(), aInfo.getLocation()); },
+ 			Access::FILELISTS_EDIT
+ 		) 
+ 	{
+@@ -117,15 +117,22 @@ namespace webserver {
+ 	api_return FilelistApi::handlePostList(ApiRequest& aRequest) {
+ 		const auto& reqJson = aRequest.getRequestBody();
+ 		addAsyncTask([
++			this,
+ 			hintedUser = Deserializer::deserializeHintedUser(reqJson),
+ 			directory = Validation::validateAdcDirectoryPath(JsonUtil::getOptionalFieldDefault<string>("directory", reqJson, ADC_ROOT_STR)),
++			full = JsonUtil::getOptionalFieldDefault<bool>("full", reqJson, false),
+ 			complete = aRequest.defer(),
+ 			caller = aRequest.getOwnerPtr()
+ 		]{
+ 			DirectoryListingPtr dl = nullptr;
+ 			try {
+ 				auto listData = FilelistAddData(hintedUser, caller, directory);
+-				dl = DirectoryListingManager::getInstance()->openRemoteFileListHookedThrow(listData, QueueItem::FLAG_PARTIAL_LIST | QueueItem::FLAG_CLIENT_VIEW);
++				QueueItem::Flags flags = QueueItem::FLAG_CLIENT_VIEW;
++				if (!full) {
++					flags.setFlag(QueueItem::FLAG_PARTIAL_LIST);
++				}
++
++				dl = DirectoryListingManager::getInstance()->openRemoteFileListHookedThrow(listData, flags.getFlags());
+ 			} catch (const Exception& e) {
+ 				complete(http::status::bad_request, nullptr, ApiRequest::toResponseErrorStr(e.getError()));
+ 				return;
+@@ -258,13 +265,18 @@ namespace webserver {
+ 	}
+ 
+ 	json FilelistApi::serializeList(const DirectoryListingPtr& aList) noexcept {
++		auto info = findSubModule(aList->getUser()->getCID());
++		return serializeList(aList, info ? info->getLocation() : json(nullptr));
++	}
++
++	json FilelistApi::serializeList(const DirectoryListingPtr& aList, const json& aLocation) noexcept {
+ 		auto partialListInfo = aList->getPartialListInfo();
+ 
+ 		return {
+ 			{ "id", aList->getUser()->getCID().toBase32() },
+ 			{ "user", Serializer::serializeHintedUser(aList->getHintedUser()) },
+ 			{ "state", FilelistInfo::serializeState(aList) },
+-			{ "location", FilelistInfo::serializeLocation(aList) },
++			{ "location", aLocation },
+ 			{ "partial_list", aList->getPartialList() },
+ 			{ "total_files", partialListInfo.fileCount },
+ 			{ "total_size", partialListInfo.size },
+diff --git a/airdcpp-webapi/api/FilelistApi.h b/airdcpp-webapi/api/FilelistApi.h
+index b1d52596..12087013 100644
+--- a/airdcpp-webapi/api/FilelistApi.h
++++ b/airdcpp-webapi/api/FilelistApi.h
+@@ -56,7 +56,8 @@ namespace webserver {
+ 		void on(DirectoryListingManagerListener::DirectoryDownloadProcessed, const DirectoryDownloadPtr& aDirectoryInfo, const DirectoryBundleAddResult& aQueueInfo, const string& aError) noexcept override;
+ 		void on(DirectoryListingManagerListener::DirectoryDownloadFailed, const DirectoryDownloadPtr& aDirectoryInfo, const string& aError) noexcept override;
+ 
+-		static json serializeList(const DirectoryListingPtr& aList) noexcept;
++		static json serializeList(const DirectoryListingPtr& aList, const json& aLocation) noexcept;
++		json serializeList(const DirectoryListingPtr& aList) noexcept;
+ 		static json serializeShareProfile(const DirectoryListingPtr& aList) noexcept;
+ 
+ 		ActionHookResult<> directoryLoadHook(const DirectoryListing::Directory::Ptr& aDirectory, const DirectoryListing& aList, const ActionHookResultGetter<>& aResultGetter) noexcept;
+diff --git a/airdcpp-webapi/api/FilelistInfo.cpp b/airdcpp-webapi/api/FilelistInfo.cpp
+index d2714d5b..3ebd768f 100644
+--- a/airdcpp-webapi/api/FilelistInfo.cpp
++++ b/airdcpp-webapi/api/FilelistInfo.cpp
+@@ -26,6 +26,8 @@
+ 
+ #include <airdcpp/hub/Client.h>
+ #include <airdcpp/filelist/DirectoryListingManager.h>
++#include <airdcpp/queue/QueueManager.h>
++#include <airdcpp/settings/SettingsManager.h>
+ #include <airdcpp/util/PathUtil.h>
+ 
+ 
+@@ -34,6 +36,30 @@ namespace webserver {
+ 		"filelist_updated"
+ 	};
+ 
++	// A deferred request that gets answered also if the list is closed before its thread gets to it
++	class FilelistInfo::ListResponse {
++	public:
++		explicit ListResponse(ApiCompletionF&& aComplete) noexcept : complete(std::move(aComplete)) {}
++		ListResponse(const ListResponse&) = delete;
++		ListResponse& operator=(const ListResponse&) = delete;
++
++		~ListResponse() {
++			abandon();
++		}
++
++		void send(http::status aStatus, const json& aData, const json& aError) {
++			if (auto f = std::exchange(complete, nullptr); f) {
++				f(aStatus, aData, aError);
++			}
++		}
++
++		void abandon() {
++			send(http::status::not_found, nullptr, ApiRequest::toResponseErrorStr("The file list was closed"));
++		}
++	private:
++		ApiCompletionF complete;
++	};
++
+ 	FilelistInfo::FilelistInfo(ParentType* aParentModule, const DirectoryListingPtr& aFilelist) : 
+ 		SubApiModule(aParentModule, aFilelist->getUser()->getCID().toBase32()), 
+ 		dl(aFilelist),
+@@ -48,6 +74,10 @@ namespace webserver {
+ 
+ 		METHOD_HANDLER(Access::FILELISTS_VIEW,	METHOD_GET,		(EXACT_PARAM("items"), RANGE_START_PARAM, RANGE_MAX_PARAM), FilelistInfo::handleGetItems);
+ 		METHOD_HANDLER(Access::FILELISTS_VIEW,	METHOD_GET,		(EXACT_PARAM("items"), TOKEN_PARAM),						FilelistInfo::handleGetItem);
++
++		METHOD_HANDLER(Access::FILELISTS_EDIT,	METHOD_POST,	(EXACT_PARAM("full_list")),									FilelistInfo::handleGetFullList);
++		// Matching may add files to the queue
++		METHOD_HANDLER(Access::DOWNLOAD,		METHOD_POST,	(EXACT_PARAM("adl_match")),									FilelistInfo::handleMatchADL);
+ 	}
+ 
+ 	void FilelistInfo::init() noexcept {
+@@ -68,6 +98,13 @@ namespace webserver {
+ 
+ 	FilelistInfo::~FilelistInfo() {
+ 		dl->removeListener(this);
++
++		// A running task keeps the module alive, so these will never be processed
++		for (const auto& r : pendingResponses) {
++			if (auto response = r.lock(); response) {
++				response->abandon();
++			}
++		}
+ 	}
+ 
+ 	void FilelistInfo::addListTask(Callback&& aTask) noexcept {
+@@ -91,19 +128,92 @@ namespace webserver {
+ 		return http::status::no_content;
+ 	}
+ 
++	api_return FilelistInfo::handleGetFullList(ApiRequest& aRequest) {
++		if (dl->getIsOwnList() || !dl->getPartialList()) {
++			aRequest.setResponseErrorStr("The full list is shown already");
++			return http::status::bad_request;
++		}
++
++		if (SETTING(USE_ADLS)) {
++			dl->setMatchADL(true);
++		}
++
++		return downloadFullList(aRequest);
++	}
++
++	api_return FilelistInfo::handleMatchADL(ApiRequest& aRequest) {
++		dl->setMatchADL(true);
++		if (!dl->getIsOwnList() && dl->getPartialList()) {
++			// Only a full list can be matched
++			return downloadFullList(aRequest);
++		}
++
++		// A list that is still being downloaded will be matched when it arrives
++		if (dl->getIsOwnList() || dl->isLoaded()) {
++			dl->addFullListTask(ADC_ROOT_STR);
++		}
++
++		return http::status::no_content;
++	}
++
++	// The list that is open gets replaced when the full list has been downloaded
++	api_return FilelistInfo::downloadFullList(ApiRequest& aRequest) {
++		dl->addAsyncTask([
++			list = dl,
++			complete = aRequest.defer(),
++			caller = aRequest.getOwnerPtr()
++		] {
++			try {
++				auto listData = FilelistAddData(list->getHintedUser(), caller, ADC_ROOT_STR);
++				QueueManager::getInstance()->addListHooked(listData, QueueItem::FLAG_CLIENT_VIEW);
++			} catch (const Exception& e) {
++				complete(http::status::bad_request, nullptr, ApiRequest::toResponseErrorStr(e.getError()));
++				return;
++			}
++
++			complete(http::status::no_content, nullptr, nullptr);
++		});
++
++		return CODE_DEFERRED;
++	}
++
++	api_return FilelistInfo::readOnListThread(ApiRequest& aRequest, std::function<json()>&& aReader) {
++		// Don't make the caller wait for a list that is being loaded for the first time
++		if (!dl->getCurrentLocationInfo().directory) {
++			throw RequestException(http::status::service_unavailable, "Filelist has not finished loading yet");
++		}
++
++		auto response = std::make_shared<ListResponse>(aRequest.defer());
++		{
++			WLock l(cs);
++			std::erase_if(pendingResponses, [](const auto& r) { return r.expired(); });
++			pendingResponses.emplace_back(response);
++		}
++
++		addListTask([response, reader = std::move(aReader)] {
++			try {
++				response->send(http::status::ok, reader(), nullptr);
++			} catch (const RequestException& e) {
++				response->send(e.getCode(), nullptr, ApiRequest::toResponseErrorStr(e.what()));
++			} catch (const std::exception& e) {
++				response->send(http::status::bad_request, nullptr, ApiRequest::toResponseErrorStr(e.what()));
++			}
++		});
++
++		return CODE_DEFERRED;
++	}
++
+ 	api_return FilelistInfo::handleGetItems(ApiRequest& aRequest) {
+ 		int start = aRequest.getRangeParam(START_POS);
+ 		int count = aRequest.getRangeParam(MAX_COUNT);
+ 
+-		{
++		return readOnListThread(aRequest, [this, start, count]() -> json {
+ 			auto curDir = ensureCurrentDirectoryLoaded();
+-			aRequest.setResponseBody({
++			return {
+ 				{ "list_path", curDir->getAdcPathUnsafe() },
+ 				{ "items", Serializer::serializeItemList(start, count, FilelistUtils::propertyHandler, currentViewItems) },
+-			});
+-		}
+-
+-		return http::status::ok;
++			};
++		});
+ 	}
+ 
+ 	DirectoryListing::DirectoryPtr FilelistInfo::ensureCurrentDirectoryLoaded() const {
+@@ -116,21 +226,9 @@ namespace webserver {
+ 			throw RequestException(http::status::service_unavailable, "Content of directory " + curDir->getAdcPathUnsafe() + " is not yet available");
+ 		}
+ 
++		// The task that initializes the view items has been queued before any request for them
+ 		if (!currentViewItemsInitialized) {
+-			// The list content is know but the module hasn't initialized view items yet
+-			// It can especially with extensions having filelist context menu items that try get fetch 
+-			// items by ID for the first time (that will trigger initialization of the filelist module)
+-
+-			// Wait as that shouldn't take too long
+-			for (auto i = 0; i < (2000 / 20); ++i) {
+-				if (!currentViewItemsInitialized) {
+-					Thread::sleep(20);
+-				}
+-			}
+-
+-			if (!currentViewItemsInitialized) {
+-				throw RequestException(http::status::service_unavailable, "Content of directory " + curDir->getAdcPathUnsafe() + " has not finished loading yet");
+-			}
++			throw RequestException(http::status::service_unavailable, "Content of directory " + curDir->getAdcPathUnsafe() + " has not finished loading yet");
+ 		}
+ 
+ 		return curDir;
+@@ -139,37 +237,37 @@ namespace webserver {
+ 	api_return FilelistInfo::handleGetItem(ApiRequest& aRequest) {
+ 		auto itemId = aRequest.getTokenParam();
+ 
+-		// Ensure directory and view items are ready (wait if needed)
+-		auto curDir = ensureCurrentDirectoryLoaded();
++		return readOnListThread(aRequest, [this, itemId]() -> json {
++			// Ensure directory and view items are ready
++			auto curDir = ensureCurrentDirectoryLoaded();
+ 
+-		FilelistItemInfoPtr item = nullptr;
+-		{
+-			RLock l(cs);
++			FilelistItemInfoPtr item = nullptr;
++			{
++				RLock l(cs);
+ 
+-			auto it = ranges::find_if(currentViewItems, [itemId](const FilelistItemInfoPtr& aInfo) {
+-				return aInfo->getToken() == itemId;
+-			});
++				auto it = ranges::find_if(currentViewItems, [itemId](const FilelistItemInfoPtr& aInfo) {
++					return aInfo->getToken() == itemId;
++				});
+ 
+-			if (it != currentViewItems.end()) {
+-				item = *it;
++				if (it != currentViewItems.end()) {
++					item = *it;
++				}
+ 			}
+-		}
+ 
+-		// Also allow querying the current directory item itself
+-		if (!item) {
+-			auto dirInfo = std::make_shared<FilelistItemInfo>(curDir, dl->getShareProfile());
+-			if (dirInfo->getToken() == itemId) {
+-				item = dirInfo;
++			// Also allow querying the current directory item itself
++			if (!item) {
++				auto dirInfo = std::make_shared<FilelistItemInfo>(curDir, dl->getShareProfile());
++				if (dirInfo->getToken() == itemId) {
++					item = dirInfo;
++				}
+ 			}
+-		}
+ 
+-		if (!item) {
+-			aRequest.setResponseErrorStr("Item " + Util::toString(itemId) + " was not found");
+-			return http::status::not_found;
+-		}
++			if (!item) {
++				throw RequestException(http::status::not_found, "Item " + Util::toString(itemId) + " was not found");
++			}
+ 
+-		aRequest.setResponseBody(Serializer::serializeItem(item, FilelistUtils::propertyHandler));
+-		return http::status::ok;
++			return Serializer::serializeItem(item, FilelistUtils::propertyHandler);
++		});
+ 	}
+ 
+ 	api_return FilelistInfo::handleChangeDirectory(ApiRequest& aRequest) {
+@@ -192,6 +290,11 @@ namespace webserver {
+ 		return currentViewItems;
+ 	}
+ 
++	json FilelistInfo::getLocation() const noexcept {
++		RLock l(cs);
++		return location;
++	}
++
+ 	string FilelistInfo::formatState(const DirectoryListingPtr& aList) noexcept {
+ 		if (aList->getDownloadState() == DirectoryListing::STATE_DOWNLOADED) {
+ 			return aList->isLoaded() ? "loaded" : "loading";
+@@ -212,8 +315,9 @@ namespace webserver {
+ 		return Serializer::serializeDownloadState(*aList.get());
+ 	}
+ 
++	// This should be called only from the filelist thread
+ 	json FilelistInfo::serializeLocation(const DirectoryListingPtr& aListing) noexcept {
+-		const auto& location = aListing->getCurrentLocationInfo();
++		const auto location = aListing->getCurrentLocationInfo();
+ 		if (!location.directory) {
+ 			// The list hasn't been loaded yet
+ 			return nullptr;
+@@ -240,15 +344,18 @@ namespace webserver {
+ 		for (const auto& f : curDir->files)
+ 			newItems.emplace_back(std::make_shared<FilelistItemInfo>(f, dl->getShareProfile()));
+ 
++		const auto newLocation = serializeLocation(dl);
++
+ 		{
+ 			WLock l(cs);
+ 			currentViewItemsInitialized = false;
+ 			currentViewItems.swap(newItems);
+ 			currentViewItemsInitialized = true;
++			location = newLocation;
+ 		}
+ 
+ 		directoryView.resetItems();
+-		onSessionUpdated({ { "location", serializeLocation(dl) }, { "read", dl->isRead() } });
++		onSessionUpdated({ { "location", newLocation }, { "read", dl->isRead() }, { "partial_list", dl->getPartialList() } });
+ 	}
+ 
+ 	void FilelistInfo::on(DirectoryListingListener::LoadingFailed, const string&) noexcept {
+diff --git a/airdcpp-webapi/api/FilelistInfo.h b/airdcpp-webapi/api/FilelistInfo.h
+index a4d5f60b..af0499e4 100644
+--- a/airdcpp-webapi/api/FilelistInfo.h
++++ b/airdcpp-webapi/api/FilelistInfo.h
+@@ -47,6 +47,9 @@ namespace webserver {
+ 		static json serializeState(const DirectoryListingPtr& aList) noexcept;
+ 		static json serializeLocation(const DirectoryListingPtr& aListing) noexcept;
+ 
++		// The location as it was when the content of it was last read (null before that)
++		json getLocation() const noexcept;
++
+ 		void init() noexcept override;
+ 		CID getId() const noexcept override;
+ 	private:
+@@ -55,9 +58,21 @@ namespace webserver {
+ 		api_return handleSetRead(ApiRequest& aRequest);
+ 		api_return handleGetItems(ApiRequest& aRequest);
+ 		api_return handleGetItem(ApiRequest& aRequest);
++		api_return handleGetFullList(ApiRequest& aRequest);
++		api_return handleMatchADL(ApiRequest& aRequest);
++		api_return downloadFullList(ApiRequest& aRequest);
+ 
++		// Must be called from the thread of the list
+ 		DirectoryListing::DirectoryPtr ensureCurrentDirectoryLoaded() const;
+ 
++		// Content of the list may only be read by the thread of the list, as that thread changes and removes it.
++		// Answers the request with what the function returns
++		api_return readOnListThread(ApiRequest& aRequest, std::function<json()>&& aReader);
++
++		// A request that waits for the thread of the list
++		class ListResponse;
++		vector<std::weak_ptr<ListResponse>> pendingResponses;
++
+ 		void on(DirectoryListingListener::LoadingFinished, int64_t aStart, const string& aDir, uint8_t aType) noexcept override;
+ 		void on(DirectoryListingListener::LoadingFailed, const string& aReason) noexcept override;
+ 		void on(DirectoryListingListener::LoadingStarted, bool changeDir) noexcept override;
+@@ -84,7 +99,9 @@ namespace webserver {
+ 
+ 		void updateItems(const string& aPath) noexcept;
+ 
+-		SharedMutex cs;
++		json location;
++
++		mutable SharedMutex cs;
+ 	};
+ 
+ 	using FilelistInfoPtr = FilelistInfo::Ptr;
+diff --git a/airdcpp-webapi/api/FilelistItemInfo.cpp b/airdcpp-webapi/api/FilelistItemInfo.cpp
+index ef725e56..88d1137e 100644
+--- a/airdcpp-webapi/api/FilelistItemInfo.cpp
++++ b/airdcpp-webapi/api/FilelistItemInfo.cpp
+@@ -45,6 +45,18 @@ namespace webserver {
+ 		}
+ 	}
+ 
++	string FilelistItemInfo::getAdlOriginPath() const noexcept {
++		if (type == FILE) {
++			return file->getOwner() ? file->getParent()->getAdcPathUnsafe() : Util::emptyString;
++		}
++
++		if (!dir->isVirtual() || dir->getParent()->isRoot()) {
++			return Util::emptyString;
++		}
++
++		return static_cast<const DirectoryListing::VirtualDirectory*>(dir.get())->getFullAdcPath();
++	}
++
+ 	void FilelistItemInfo::getLocalPathsThrow(StringList& paths_) const {
+ 		// TODO
+ 		if (type == DIRECTORY) {
+diff --git a/airdcpp-webapi/api/FilelistItemInfo.h b/airdcpp-webapi/api/FilelistItemInfo.h
+index 0b07bee8..af4f98db 100644
+--- a/airdcpp-webapi/api/FilelistItemInfo.h
++++ b/airdcpp-webapi/api/FilelistItemInfo.h
+@@ -58,7 +58,12 @@ namespace webserver {
+ 		void getLocalPathsThrow(StringList& paths_) const;
+ 
+ 		time_t getDate() const noexcept { return type == DIRECTORY ? dir->getRemoteDate() : file->getRemoteDate(); }
+-		int64_t getSize() const noexcept { return type == DIRECTORY ? dir->getTotalSize(false) : file->getSize(); }
++		int64_t getSize() const noexcept { return type == DIRECTORY ? dir->getTotalSize(dir->isVirtual()) : file->getSize(); }
++
++		// A result folder of ADLSearch, or something that it holds
++		bool isAdl() const noexcept { return type == DIRECTORY ? dir->isVirtual() : !!file->getOwner(); }
++		// The path of the matched directory, or of the directory of the matched file
++		string getAdlOriginPath() const noexcept;
+ 
+ 		DirectoryListingItemToken getToken() const noexcept;
+ 
+diff --git a/airdcpp-webapi/api/FilelistUtils.cpp b/airdcpp-webapi/api/FilelistUtils.cpp
+index f502bcaa..9fde25e0 100644
+--- a/airdcpp-webapi/api/FilelistUtils.cpp
++++ b/airdcpp-webapi/api/FilelistUtils.cpp
+@@ -36,6 +36,7 @@ namespace webserver {
+ 		{ PROP_TTH, "tth", TYPE_TEXT, SERIALIZE_TEXT, SORT_TEXT },
+ 		{ PROP_DUPE, "dupe", TYPE_NUMERIC_OTHER, SERIALIZE_CUSTOM, SORT_NUMERIC },
+ 		{ PROP_COMPLETE, "complete", TYPE_NUMERIC_OTHER, SERIALIZE_BOOL, SORT_NUMERIC },
++		{ PROP_ADL, "adl", TYPE_NUMERIC_OTHER, SERIALIZE_CUSTOM, SORT_NUMERIC },
+ 	};
+ 
+ 	const PropertyItemHandler<FilelistItemInfoPtr> FilelistUtils::propertyHandler(properties,
+@@ -53,6 +54,11 @@ namespace webserver {
+ 					return Serializer::serializeFileType(aItem->getAdcPath());
+ 				}
+ 
++				// Result folders of ADLSearch have no content information of their own
++				if (aItem->dir->isVirtual()) {
++					return Serializer::serializeFolderType(aItem->dir->getContentInfoRecursive(true));
++				}
++
+ 				return Serializer::serializeFolderType(aItem->dir->getContentInfo());
+ 			}
+ 			case PROP_DUPE:
+@@ -70,6 +76,17 @@ namespace webserver {
+ 
+ 				return Serializer::serializeDupe(aItem->getDupe(), std::move(paths));
+ 			}
++			case PROP_ADL:
++			{
++				if (!aItem->isAdl()) {
++					return nullptr;
++				}
++
++				// Where the matched item is in the list (empty for the result folders themselves)
++				return {
++					{ "path", aItem->getAdlOriginPath() },
++				};
++			}
+ 			default: dcassert(0); return nullptr;
+ 		}
+ 	}
+@@ -121,6 +138,7 @@ namespace webserver {
+ 		case PROP_DATE: return (double)aItem->getDate();
+ 		case PROP_DUPE: return (double)aItem->getDupe();
+ 		case PROP_COMPLETE: return (double)aItem->isComplete();
++		case PROP_ADL: return (double)aItem->isAdl();
+ 		default: dcassert(0); return 0;
+ 		}
+ 	}
+diff --git a/airdcpp-webapi/api/FilelistUtils.h b/airdcpp-webapi/api/FilelistUtils.h
+index f04575cb..f8a64770 100644
+--- a/airdcpp-webapi/api/FilelistUtils.h
++++ b/airdcpp-webapi/api/FilelistUtils.h
+@@ -41,6 +41,7 @@ namespace webserver {
+ 			PROP_TTH,
+ 			PROP_DUPE,
+ 			PROP_COMPLETE,
++			PROP_ADL,
+ 			PROP_LAST
+ 		};
+ 
+diff --git a/airdcpp-webapi/web-server/Session.cpp b/airdcpp-webapi/web-server/Session.cpp
+index ccf8cb82..0b102b63 100644
+--- a/airdcpp-webapi/web-server/Session.cpp
++++ b/airdcpp-webapi/web-server/Session.cpp
+@@ -21,6 +21,7 @@
+ #include <web-server/ApiRequest.h>
+ 
+ #include <api/AdcCommandApi.h>
++#include <api/AdlSearchApi.h>
+ #include <api/ConnectivityApi.h>
+ #include <api/ExtensionApi.h>
+ #include <api/EventApi.h>
+@@ -60,6 +61,7 @@ namespace webserver {
+ 		server(aServer) {
+ 
+ 		ADD_MODULE("adc_commands", AdcCommandApi);
++		ADD_MODULE("adl", AdlSearchApi);
+ 		ADD_MODULE("connectivity", ConnectivityApi);
+ 		ADD_MODULE("extensions", ExtensionApi);
+ 		ADD_MODULE("events", EventApi);
+diff --git a/airdcppd/Client.cpp b/airdcppd/Client.cpp
+index 76d5b513..cbde9d63 100644
+--- a/airdcppd/Client.cpp
++++ b/airdcppd/Client.cpp
+@@ -32,6 +32,7 @@
+ #include <airdcpp/filelist/DirectoryListingManager.h>
+ #include <airdcpp/hub/activity/ActivityManager.h>
+ #include <airdcpp/hub/ClientManager.h>
++#include <airdcpp/modules/ADLSearch.h>
+ #include <airdcpp/settings/SettingsManager.h>
+ 
+ #include <web-server/FileServer.h>
+@@ -118,6 +119,8 @@ bool Client::startup(const dcpp::StartupParams& aStartupParams) {
+ 		nullptr, // wizard
+ 		progressF,
+ 		[&] {
++			ADLSearchManager::newInstance();
++
+ 			// Add the command listeners here so that we won't miss any messages while loading
+ 			auto cdmHub = aStartupParams.hasParam("--cdm-hub");
+ 			auto cdmClient = aStartupParams.hasParam("--cdm-client");
+@@ -127,6 +130,8 @@ bool Client::startup(const dcpp::StartupParams& aStartupParams) {
+ 			}
+ 		}, // module init
+ 		[&](StartupLoader& aLoader) { // module load
++			ADLSearchManager::getInstance()->load();
++
+ 			auto webResources = aStartupParams.getValue("--web-resources");
+ 			aLoader.stepF(STRING(WEB_SERVER));
+ 			serverStarted = wsm->startup(
+@@ -190,6 +195,9 @@ void Client::shutdown() {
+ 			unloadModules,
+ 			destroyModules
+ 	);
++
++	// After the file lists, which use it
++	ADLSearchManager::deleteInstance();
+ }
+ 
+ void Client::on(DirectoryListingManagerListener::OpenListing, const DirectoryListingPtr& aList, const string& aDir, const string& aXML) noexcept {

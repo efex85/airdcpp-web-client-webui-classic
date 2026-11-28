@@ -8,9 +8,11 @@ import {
   Folder,
   FolderOpen,
   FolderSync,
+  ListFilter,
   RefreshCw,
 } from 'lucide-react';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { matchAdl } from '../actions/adl';
 import { copyText, openSearch, refreshInShare } from '../actions';
 import { directoryDownload, downloadAll, downloadMenu, fileDownload, type Downloadable } from '../actions/download';
 import { remoteMenu } from '../actions/menus';
@@ -20,12 +22,13 @@ import { DataTable, type Column, type RowMenu } from '../components/DataTable';
 import { showItemDetails } from '../components/ItemDetails';
 import { Splitter } from '../components/Splitter';
 import { useAccess } from '../lib/access';
+import { downloadName, isResultFolder, isResultPath, originPath } from '../lib/adl';
 import { dupeClass } from '../lib/dupe';
 import { clearText, dupeShown, emptyFilter, filelistMatcher } from '../lib/filelistFilter';
 import { formatDate, formatSize } from '../lib/format';
 import { magnetLink } from '../lib/magnet';
 import { lastSegment, parentPath, pathChain } from '../lib/path';
-import { addDirectory, treeRows, type Tree } from '../lib/tree';
+import { addDirectory, dropResultContent, treeRows, type Tree } from '../lib/tree';
 import { useIsMobile } from '../lib/useIsMobile';
 import { reportError, useApp } from '../store/app';
 import { useFilterOptions } from '../store/filelistFilter';
@@ -60,7 +63,8 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
   const { id, user, state } = session;
   const own = user.flags.includes('self');
   const mobile = useIsMobile();
-  const canRefresh = useAccess()('share_edit') && own;
+  const access = useAccess();
+  const canRefresh = access('share_edit') && own;
   const generation = useApp((s) => s.generation);
   const path = session.location?.path;
   const [listing, setListing] = useState<Listing | null>(null);
@@ -71,6 +75,8 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
   const [filter, setFilter] = useState(emptyFilter);
   const options = useFilterOptions();
   const shownPath = useRef<string | undefined>(undefined);
+  /** The IDs of the result folders, which are new after every matching */
+  const results = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!path || state.id !== 'loaded') {
@@ -91,7 +97,17 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
 
             shownPath.current = result.list_path;
             setListing({ path: result.list_path, items: result.items });
-            setTree((t) => addDirectory(t, result.list_path, result.items.filter(isDirectory)));
+
+            let rematched = false;
+            if (result.list_path === '/') {
+              const found = result.items.filter(isResultFolder).map((i) => i.id).join();
+              rematched = results.current !== undefined && results.current !== found;
+              results.current = found;
+            }
+
+            setTree((t) =>
+              addDirectory(rematched ? dropResultContent(t) : t, result.list_path, result.items.filter(isDirectory)),
+            );
           }
         },
         (e) => {
@@ -148,18 +164,28 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
   };
 
   const download = (item: FilelistItem): Downloadable =>
-    isDirectory(item) ? directoryDownload(user, item.path, item.name) : fileDownload(user, item);
+    isDirectory(item)
+      ? // A folder that was matched is downloaded from where it is in the list
+        directoryDownload(user, originPath(item) ?? item.path, downloadName(item.name))
+      : fileDownload(user, item);
+
+  /** Where an item is in the list; ADL Search shows folders in other places, too */
+  const realPath = (item: FilelistItem) => (isDirectory(item) ? (originPath(item) ?? item.path) : item.path);
 
   const menu = (items: FilelistItem[]): RowMenu => {
     const single = items.length === 1 ? items[0] : null;
     const files = items.filter((i) => !isDirectory(i));
+    const origin = single ? originPath(single) : undefined;
+    const resultFolder = !!single && isResultFolder(single);
     return {
       entries: [
         ...(single && isDirectory(single) ? [{ label: 'Open', bold: own, onClick: () => void navigate(single.path) }] : []),
         ...(own ? [] : downloadMenu(items.map(download))),
+        ...(origin ? [{ label: 'Go to directory', onClick: () => void navigate(origin) }] : []),
         'separator',
-        ...(single ? viewEntries(single, user, own) : []),
-        ...(canRefresh
+        // A result folder of ADL Search isn't a folder of the user, so there's nothing to look up in it
+        ...(single && !resultFolder ? viewEntries({ ...single, path: realPath(single) }, user, own) : []),
+        ...(canRefresh && !items.some((i) => i.adl)
           ? [
               {
                 label: 'Refresh in share',
@@ -176,12 +202,12 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
         },
         {
           label: 'Search for the name',
-          disabled: !single,
+          disabled: !single || resultFolder,
           onClick: () => openSearch({ pattern: single!.name, fileType: isDirectory(single!) ? 'directory' : 'any' }),
         },
         'separator',
         { label: 'Copy name', onClick: () => void copyText(items.map((i) => i.name).join('\n')) },
-        { label: 'Copy path', onClick: () => void copyText(items.map((i) => i.path).join('\n')) },
+        { label: 'Copy path', onClick: () => void copyText(items.map(realPath).join('\n')) },
         { label: 'Copy magnet link', disabled: !files.length, onClick: () => void copyText(files.map(magnetLink).join('\n')) },
         'separator',
         { label: 'Details', disabled: !single, onClick: () => void showItemDetails(single!) },
@@ -215,7 +241,7 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
           role="treeitem"
           aria-selected={node.path === path}
           aria-expanded={children.length ? isOpen : undefined}
-          className={`tree-row${node.path === path ? ' selected' : ''}`}
+          className={`tree-row${node.path === path ? ' selected' : ''}${isResultPath(node.path) ? ' adl' : ''}`}
           style={{ paddingLeft: depth * 14 + 2 }}
         >
           <button
@@ -258,8 +284,8 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
       itemKey={(i) => String(i.id)}
       icon={(i) => (isDirectory(i) ? <Folder size={13} className="i-folder" /> : <File size={13} />)}
       // Everything in the own list is shared, so there is nothing to point out
-      rowClass={own ? undefined : (i) => dupeClass(i.dupe)}
-      rank={(i) => (isDirectory(i) ? 0 : 1)}
+      rowClass={(i) => (isResultFolder(i) ? 'adl-result' : own ? undefined : dupeClass(i.dupe))}
+      rank={(i) => (isResultFolder(i) ? -1 : isDirectory(i) ? 0 : 1)}
       defaultSort={{ column: 'name', desc: false }}
       menu={menu}
       onActivate={(i) => {
@@ -298,7 +324,14 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
         >
           <ArrowUp size={13} />
         </button>
-        <button type="button" aria-label="Reload" title="Reload" disabled={!path} onClick={() => void navigate(path!, true)}>
+        <button
+          type="button"
+          aria-label="Reload"
+          title={session.partial_list ? 'Reload' : 'A full list can\u2019t be reloaded'}
+          // The client only reloads folders of lists of which a part is open
+          disabled={!path || !session.partial_list}
+          onClick={() => void navigate(path!, true)}
+        >
           <RefreshCw size={13} />
         </button>
         <nav className="breadcrumbs" aria-label="Path">
@@ -308,7 +341,7 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
             </button>
           ))}
         </nav>
-        {canRefresh && path && (
+        {canRefresh && path && !isResultPath(path) && (
           <button type="button" aria-label="Refresh in share" title="Refresh this folder in the share" onClick={() => void refreshInShare([path])}>
             <FolderSync size={13} />
           </button>
@@ -318,11 +351,34 @@ const View = ({ session, active }: { session: FilelistSession; active: boolean }
             type="button"
             title="Download this folder"
             onClick={(e) => {
-              const entries = downloadMenu([directoryDownload(user, path, lastSegment(path))]);
-              openMenu({ x: e.clientX, y: e.clientY }, entries, undefined, lastSegment(path));
+              const name = downloadName(lastSegment(path));
+              const entries = downloadMenu([directoryDownload(user, path, name)]);
+              openMenu({ x: e.clientX, y: e.clientY }, entries, undefined, name);
             }}
           >
             <Download size={13} />
+          </button>
+        )}
+        {access('download') && (
+          <button
+            type="button"
+            className="match-adl"
+            title="Match the ADL searches against this list"
+            aria-label="Match ADL"
+            disabled={state.id !== 'loaded'}
+            onClick={() =>
+              void matchAdl(session).then((started) => {
+                if (started) {
+                  // The results are at the top of the list
+                  void navigate('/');
+                }
+              })
+            }
+          >
+            <ListFilter size={13} />
+            <span>
+              <span className="match-word">Match </span>ADL
+            </span>
           </button>
         )}
       </div>

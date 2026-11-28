@@ -15,6 +15,7 @@ import { useApp, windowId, windowType } from './store/app';
 import { colorsDoc, useDoc } from './store/docs';
 import { useLocalSettings } from './store/localSettings';
 import { logout } from './store/session';
+import { AdlSearchView } from './views/AdlSearch';
 import { FavoriteHubs } from './views/FavoriteHubs';
 import { Filelist } from './views/Filelist';
 import { FileViewer } from './views/FileViewer';
@@ -41,6 +42,8 @@ const WindowContent = ({ tabKey, active }: { tabKey: string; active: boolean }) 
       return <Queue />;
     case 'transfers':
       return <Transfers />;
+    case 'adl':
+      return <AdlSearchView active={active} />;
     case 'settings':
       return <SettingsView />;
     case 'hub':

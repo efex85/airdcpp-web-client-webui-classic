@@ -26,6 +26,7 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   { id: 'quick_connect', label: 'Quick connect', key: 'Alt+C' },
   { id: 'queue', label: 'Download queue', key: 'Alt+U' },
   { id: 'transfers', label: 'Transfers', key: 'Alt+R' },
+  { id: 'adl', label: 'ADL Search', key: '' },
   { id: 'transfer_pane', label: 'Show or hide the transfer pane', key: 'Alt+P' },
   { id: 'own_list', label: 'Open own file list', key: 'Alt+L' },
   { id: 'syslog', label: 'System log', key: 'Alt+G' },

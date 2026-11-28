@@ -66,6 +66,8 @@ interface Props<T> {
   scrollKey?: string;
   /** Tap on small screens (default: activate, or the menu for lists without a default action) */
   mobileTap?: Tap | ((item: T) => Tap);
+  /** The order of the items matters: the list can't be sorted */
+  fixedOrder?: boolean;
   /** Keeps items of a lower rank first regardless of the sort order (folders before files) */
   rank?: (item: T) => number;
   empty?: ReactNode;
@@ -111,6 +113,7 @@ export function DataTable<T>({
   scrollKey,
   mobileTap,
   rank,
+  fixedOrder,
   empty,
 }: Props<T>) {
   const mobile = useIsMobile();
@@ -188,7 +191,7 @@ export function DataTable<T>({
   };
   const totalWidth = visibleColumns.reduce((sum, c) => sum + width(c), 0);
 
-  const sort = preferences.sort === undefined ? (defaultSort ?? null) : preferences.sort;
+  const sort = fixedOrder ? null : preferences.sort === undefined ? (defaultSort ?? null) : preferences.sort;
   const sortColumn = columns.find((c) => c.id === sort?.column);
 
   const sorted = useMemo(
@@ -440,6 +443,10 @@ export function DataTable<T>({
   /* Header */
 
   const toggleSort = (column: string) => {
+    if (fixedOrder) {
+      return;
+    }
+
     if (sort?.column !== column) {
       update({ sort: { column, desc: false } });
     } else {
@@ -556,7 +563,7 @@ export function DataTable<T>({
           )}
         </div>
       )}
-      {mobile && !selecting && rows.length > 1 && (
+      {mobile && !selecting && !fixedOrder && rows.length > 1 && (
         <div className="table-sort">
           <label>
             Sort

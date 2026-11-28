@@ -1,4 +1,5 @@
 // Directory tree of a file list, filled in as directories are opened
+import { isResultPath } from './adl';
 import { lastSegment, pathChain } from './path';
 
 export interface TreeNode {
@@ -36,6 +37,25 @@ export const addDirectory = (tree: Tree, path: string, subdirectories: { path: s
   return next;
 };
 
+/** Forgets what is inside the result folders of ADL Search */
+export const dropResultContent = (tree: Tree): Tree => {
+  const next = new Map(tree);
+  for (const [path, node] of tree) {
+    if (!isResultPath(path)) {
+      continue;
+    }
+
+    // The result folders themselves stay, as the root still lists them
+    if (path.indexOf('/', 1) === path.length - 1) {
+      next.set(path, { path, name: node.name });
+    } else {
+      next.delete(path);
+    }
+  }
+
+  return next;
+};
+
 export interface TreeRow {
   node: TreeNode;
   depth: number;
@@ -63,7 +83,12 @@ export const treeRows = (tree: Tree, expanded: ReadonlySet<string>, current: str
     rows.push({ node, depth, children, expanded: isExpanded });
     if (isExpanded) {
       [...children]
-        .sort((a, b) => collator.compare(tree.get(a)?.name ?? a, tree.get(b)?.name ?? b))
+        // Result folders of ADL Search come first
+        .sort(
+          (a, b) =>
+            Number(isResultPath(b)) - Number(isResultPath(a)) ||
+            collator.compare(tree.get(a)?.name ?? a, tree.get(b)?.name ?? b),
+        )
         .forEach((child) => visit(child, depth + 1));
     }
   };

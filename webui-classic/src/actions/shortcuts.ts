@@ -30,6 +30,7 @@ const ACTIONS: Record<string, () => unknown> = {
   search: () => openSearch(),
   home: () => useApp.getState().homeEnabled && showWindow('home'),
   favorites: () => showWindow('favorites'),
+  adl: () => showWindow('adl'),
   quick_connect: () => quickConnect(),
   queue: () => showWindow('queue'),
   transfers: () => showWindow('transfers'),
